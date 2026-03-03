@@ -1,0 +1,13 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/Codigo/CJF.SGCPJ.APP/.vs
+.vs
+/Codigo/CJF.Sgcpj.Judicatura/src/Functions/Catalogos.Funtions/local.settings.json
+/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App/.vscode
+.vscode
+/Codigo/CJF.Sgcpj.Judicatura/src/Functions/Tramites.Functions/local.settings.json
+/.gitignore
+/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App/.env.dev
+/.gitignore

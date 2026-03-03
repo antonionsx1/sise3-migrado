@@ -1,0 +1,141 @@
+trigger:
+  branches:
+    include:
+    - Develop
+
+pool: 'SISE-CICD-DEV'
+
+variables:
+  tag: '$(Build.BuildId)'
+  pathBuildContext: '$(Build.SourcesDirectory)/Codigo'
+  env: 'dev'
+  buildConfiguration: 'Release'
+
+jobs:
+  - job: SonarAnalysis
+    workspace:
+      clean: all # what to clean up before the job runs
+    steps:
+    #Restaurar nugets de todas las soluciones
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: 'SC-DEV-SISE'
+        KeyVaultName: 'kv-ussc-dev-sise'
+        SecretsFilter: '*'
+        RunAsPreJob: false
+      displayName: 'Get secrets'  
+    - task: Bash@3
+      displayName: 'Save CJF CA to file' 
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "$(CertRaizcjf-CACJF-CA)" > $(pathBuildContext)/cjf-CACJF-CA.pem
+      
+    - bash: |
+        #FOO="/home/adminazure/cjf-CACJF-CA.pem"
+        echo "##vso[task.setvariable variable=NODE_EXTRA_CA_CERTS]$(pathBuildContext)/cjf-CACJF-CA.pem"
+      displayName: 'Set Node ENV variable' 
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore Nuget Packages' 
+      inputs:
+        command: 'restore'
+        projects: '$(pathBuildContext)/CJF.Sgcpj.Judicatura/CJF.Sgcpj.Judicatura.sln'
+        feedsToUse: 'config'
+        nugetConfigPath: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura/nuget.config'
+    - task: SonarQubePrepare@7
+      displayName: 'SonarQube Prepare AF'
+      inputs:
+        SonarQube: 'SonarQube'
+        scannerMode: 'dotnet'
+        projectKey: 'SISE3-Functions'
+        projectName: 'SISE3-Functions'
+    - bash: |
+        FILTERED_PARAMS=$(echo $SONARQUBE_SCANNER_PARAMS | sed 's/"sonar.branch.name":".*"\,//g')
+        echo "##vso[task.setvariable variable=SONARQUBE_SCANNER_PARAMS]$FILTERED_PARAMS"
+      displayName: Filter out non-CE sonar parameters
+    - task: DotNetCoreCLI@2
+      displayName: 'DotNet Build AF'
+      inputs:
+        command: 'build'
+        projects: '$(pathBuildContext)/CJF.Sgcpj.Judicatura/CJF.Sgcpj.Judicatura.sln'
+    - task: SonarQubeAnalyze@7
+      displayName: 'SonarQube Analyze AF'
+    - task: SonarQubePublish@7
+      displayName: 'SonarQube Publish AF'
+      inputs:
+        pollingTimeoutSec: '300'
+    # - task: CmdLine@2
+    #   inputs:
+    #     script: |
+    #       export PATH="/home/adminazure/.dotnet/tools:$PATH"
+    #       dotnet sonarscanner begin /k:"SISE-Promociones.Functions" /d:sonar.host.url="https://vmlusscsonardsi.cjf.gob.mx/"  /d:sonar.token="$(SonarGlobalAnalysisToken)"
+    # - task: DotNetCoreCLI@2
+    #   displayName: 'DotNet Build AF Promocion'
+    #   inputs:
+    #     command: 'build'
+    #     projects: '$(pathBuildContext)/src/Functions/Promociones.Functions/*.csproj'
+    # - task: CmdLine@2
+    #   inputs:
+    #     script: |
+    #       export PATH="/home/adminazure/.dotnet/tools:$PATH"
+    #       dotnet sonarscanner end /d:sonar.token="$(SonarGlobalAnalysisToken)"
+    # - task: CmdLine@2
+    #   inputs:
+    #     script: |
+    #       export PATH="$PATH:/opt/sonar-scanner/bin"
+    #       export SONAR_SCANNER_OPTS: "-Djavax.net.ssl.keyStore=/usr/lib/jvm/java-17-openjdk-amd64/lib/security/cacerts -Djavax.net.ssl.keyStorePassword=$(JavaTrustedStorePassword)"
+    #       sonar-scanner \
+    #       -Dsonar.projectKey=SISE-WebApp \
+    #       -Dsonar.sources=. \
+    #       -Dsonar.host.url=https://vmlusscsonardsi.cjf.gob.mx/ \
+    #       -Dsonar.token=$(SonarGlobalAnalysisToken)
+    #     workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App'
+    - task: NodeTool@0
+      displayName: 'Node 18 Install'
+      inputs:
+        versionSource: 'spec'
+        versionSpec: '18.x'
+    - task: CmdLine@2
+      displayName: 'NPM & Quasar build'
+      inputs:
+        script: |
+          npm install -g @vue/cli
+          npm install -g @quasar/cli
+          npm install
+          npm run build
+        workingDirectory: '$(pathBuildContext)/CJF.Sgcpj.App/CJF.Sgcpj.App'    
+    - task: SonarQubePrepare@7
+      inputs:
+        SonarQube: 'SonarQube'
+        scannerMode: 'CLI'
+        configMode: 'manual'
+        cliProjectKey: 'SISE3-WebApp'
+        cliProjectName: 'SISE3-WebApp'
+        cliSources: '$(pathBuildContext)/CJF.Sgcpj.App/CJF.Sgcpj.App'
+      displayName: 'SonarQube SISE-WebApp'
+    - bash: |
+        FILTERED_PARAMS=$(echo $SONARQUBE_SCANNER_PARAMS | sed 's/"sonar.branch.name":".*"\,//g')
+        echo "##vso[task.setvariable variable=SONARQUBE_SCANNER_PARAMS]$FILTERED_PARAMS"
+      displayName: Filter out non-CE sonar parameters
+    - task: SonarQubeAnalyze@7
+      displayName: 'SonarQube Analyze SISE-WebApp'
+      continueOnError: true 
+    - task: SonarQubePublish@7
+      displayName: 'SonarQube Publish SISE-WebApp'
+      inputs:
+        pollingTimeoutSec: '300'
+
+
+
+    # - task: CmdLine@2
+    #   displayName: 'SonarQube Analysis & Publish SISE3-WebApp'
+    #   inputs:
+    #     script: |
+    #       export PATH="$PATH:/opt/sonar-scanner/bin"
+    #       sonar-scanner -v
+    #       sonar-scanner \
+    #         -Dsonar.projectKey=SISE3-WebApp \
+    #         -Dsonar.sources=. \
+    #         -Dsonar.host.url=https://vmlusscsonardsi.cjf.gob.mx \
+    #         -Dsonar.token=$(SonarGlobalAnalysisToken)
+    #     workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App'

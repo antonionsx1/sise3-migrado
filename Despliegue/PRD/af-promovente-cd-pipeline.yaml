@@ -1,0 +1,83 @@
+trigger:
+- none
+
+pool: 'SISE-CICD-PRD'
+  
+variables:
+  tag: '$(Build.BuildId)'
+  pathBuildContext: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura/src/Promovente/Promovente.Functions'
+  env: 'prd'
+  buildConfiguration: 'Release'
+
+stages:
+- stage: Backend
+  jobs:
+  - job: CD
+    workspace:
+      clean: all # what to clean up before the job runs
+    steps:
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: 'SC-PRD-SISE'
+        KeyVaultName: 'kv-ussc-prd-sise'
+        SecretsFilter: '*'
+        RunAsPreJob: false
+      displayName: 'Get secrets'  
+    - task: NuGetToolInstaller@1
+      inputs:
+        versionSpec: 'x'
+        checkLatest: true
+      displayName: 'Nuget tool install'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'restore'
+        projects: '$(pathBuildContext)/Promovente.Functions.csproj'
+        feedsToUse: 'select'
+      displayName: 'dotnet restore'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'build'
+        arguments: '--no-restore --configuration $(buildConfiguration)'
+        projects: '$(pathBuildContext)/Promovente.Functions.csproj'
+      displayName: 'dotnet build'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'publish'
+        projects: '$(pathBuildContext)/Promovente.Functions.csproj'
+        publishWebProjects: false
+        arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
+        zipAfterPublish: true
+      displayName: 'Publish the project - $(buildConfiguration)'  
+    - task: AzureAppServiceSettings@1
+      inputs:
+        azureSubscription: 'SC-PRD-SISE'
+        appName: 'func-ussc-prd-sise-promoventes'
+        resourceGroupName: 'RG-USSC-PRD-SISE'
+        appSettings: |
+          [
+             {
+              "name": "AppConfigurationConnStr",
+              "value": "$(AppConfigurationConnStr)",
+              "slotSetting": false
+             },
+             {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "$(AppInsightsInstrumentationKey)",
+              "slotSetting": false
+             },
+             {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "$(AppInsightsConnStr)",
+              "slotSetting": false
+             }
+          ]
+      displayName: 'Deploy App Settings'
+    - task: AzureFunctionApp@2
+      inputs:
+        connectedServiceNameARM: 'SC-PRD-SISE'
+        appType: 'functionAppLinux'
+        appName: 'func-ussc-prd-sise-promoventes'
+        package: '$(Build.ArtifactStagingDirectory)/$(buildConfiguration)/Promovente.Functions.zip'
+        runtimeStack: 'DOTNET|8.0'
+        deploymentMethod: 'auto'
+      displayName: 'Deploy to Function App'  

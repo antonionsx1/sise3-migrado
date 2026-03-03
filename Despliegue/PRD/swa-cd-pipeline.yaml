@@ -1,0 +1,81 @@
+trigger:
+- none
+
+pool: 'SISE-CICD-PRD'
+
+variables:
+  tag: '$(Build.BuildId)'
+  pathBuildContext: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App'
+  env: 'prd'
+  buildConfiguration: 'Release'
+
+stages:
+- stage: FrontEnd
+  jobs:
+  - job: CD
+    workspace:
+      clean: all # what to clean up before the job runs
+    steps:
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: 'SC-PRD-SISE'
+        KeyVaultName: 'kv-ussc-prd-sise'
+        SecretsFilter: '*'
+        RunAsPreJob: false
+      displayName: 'Get secrets'  
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: 
+          (Get-Content .env.prd -Encoding UTF8) | Foreach-Object {
+            $_  -replace '#{AADB2CClientID}#', '$(AADB2CPROVIDERCLIENTID)' `
+            } | Set-Content .env.prd 
+        workingDirectory: $(pathBuildContext)
+      displayName: 'Replace ENV token'   
+    - task: NodeTool@0
+      inputs:
+        versionSource: 'spec'
+        versionSpec: '18.x'
+      displayName: 'Node.js install'
+    - task: CmdLine@2
+      inputs:
+        script: |
+          npm install -g @vue/cli
+          npm install -g @quasar/cli
+          npm install
+          quasar clean
+          npm run build:prd
+        workingDirectory: '$(pathBuildContext)'
+      displayName: 'npm build'
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'SC-PRD-SISE'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "##vso[task.setvariable variable=SISE3:BackEnd:AADB2COpenIdConfigUrl;issecret=true]$(az appconfig kv show -n appcs-ussc-prd-sise --key SISE3:BackEnd:AADB2COpenIdConfigUrl | jq -r '.value')"
+      displayName: 'Access App Configuration Key Values'
+    - task: PowerShell@2
+      inputs:
+        targetType: 'inline'
+        script: 
+          (Get-Content staticwebapp.config.json -Encoding UTF8) | Foreach-Object {
+            $_  -replace '#{AADB2COpenIdConfigUrl}#', '$(SISE3:BackEnd:AADB2COpenIdConfigUrl)'
+            } | Set-Content staticwebapp.config.json 
+        workingDirectory: $(pathBuildContext)
+      displayName: 'Replace config tokens'
+    - task: CmdLine@2
+      inputs:
+        script: 'cp staticwebapp.config.json $(pathBuildContext)/dist/pwa/staticwebapp.config.json'
+        workingDirectory: '$(pathBuildContext)'
+      displayName: 'Copy config json'
+    - task: AzureStaticWebApp@0
+      inputs:
+        app_location: '/dist/pwa'
+        output_location: '/dist/pwa'
+        skip_app_build: true
+        skip_api_build: true
+        workingDirectory: '$(pathBuildContext)'
+        azure_static_web_apps_api_token: '$(StaticWebAppDeploymentToken)'
+      displayName: 'Deploy to Azure Static Web App'  
+    

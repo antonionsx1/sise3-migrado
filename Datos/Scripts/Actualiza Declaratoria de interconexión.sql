@@ -1,0 +1,1 @@
+UPDATE dbo.TiposAsunto set StatusReg = 0 where TipoAsuntoId = 26146

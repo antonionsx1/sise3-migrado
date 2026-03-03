@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: SISEFunctions
+data:
+  SMTPTemplatesUrl: https://stausscdevcode.blob.core.windows.net/
+  OficiosContenedor: oficios
+  COEPlantilasContenedor: plantilascoe
+  OficiosPlantillasContenedor: plantillasoficios
+  OccAPI: http://10.100.126.237/sise.gateway/electronicfolio/send
+  OccApiIdentity: http://10.100.126.237/wsIdentity/v1/systKey  
+  OficiosPlantillasRecursosContenedor: plantillasrecursos
+  SMTPPort: 25
+  SMTPIp: correo.cjf.gob.mx  
+  AlertasUrlCola: https://stausscdevcode.queue.core.windows.net/
+  AlertasUrlTabla: https://stausscdevcode.table.core.windows.net/
+  SMTPTemplatesContainer: emailtemplates
+  AuthNFuncionesExcluidas: EliminarAlertasRoutine.EliminarAlertasRoutineCommand|EnviarAlerta.EnviarAlertasCommand|CreacionOficiosComando.CrearOficiosCommand
+  AADB2CLoginInstance: https://b2ccjfdev.b2clogin.com/b2ccjfdev.onmicrosoft.com/b2c_1_susi/v2.0/
+  AADB2CClientID: MGFmYzZkZTktM2JhMy00N2NiLTlmNzktNzUwMTkwZWNhOGY5
+  NASTamanioArchivo: 30
+  NASExtensionValidaArchivos: .pdf,.docx,.doc
+  ArchivoFirmaHexDOCX: 504B030414000600
+  ArchivoFirmaHexPDF: 25504446,255044460A,0D0A2525454F460D0A,2525254F460D
+  Fonts: fonts  
+  NASActivo: true
+  NASMaxReadSize: 200000
+  FirmadorEndPointLecturaDocumento: https://func-ussc-dev-sise-documentos.azurewebsites.net/api/archivo?modulo={0}&id=
+  PathFonts: /home/.local/share/fonts/
+  FirmadorPlantillasContenedor: plantillasfirmador
+  IADatosSensiblesUrl: https://openai-dgetd-dev.openai.azure.com/openai/deployments/dgetd-ai-35/chat/completions?
+  IADatosSensiblesVersion: 2023-07-01-preview  
+  FirmadorUrlIniciar: http://cjfappspba.cjf.gob.mx/FirmaElectronicaWeb/api/transaccion/iniciar
+  FirmadorEndPointGuardadoDocumento: https://func-ussc-dev-sise-documentos.azurewebsites.net/api/archivo
+  FirmadorUrlRetorno: https://thankful-pond-0cbdffa10.3.azurestaticapps.net/#/tramite  
+  FirmadorUrlToken: http://cjfappspba.cjf.gob.mx/WCFSeguridadDes/api/jwt-app/generar
+  SMTPTemplatesVerPromoUrl: https://thankful-pond-0cbdffa10.3.azurestaticapps.net/#/oficialia?urlVerPromo=
+  FirmadorUrlRetornoOficialia: https://thankful-pond-0cbdffa10.3.azurestaticapps.net/#/oficialia
+  FirmadorUrlRetornoSentencia: https://thankful-pond-0cbdffa10.3.azurestaticapps.net/#/sentencias
+  FirmadorUrlEstadoDocumentos: http://cjfappspba.cjf.gob.mx/FirmaElectronicaWeb/api/transaccion/info/docs/
+  URLValidateSystem: http://10.100.126.237/sise.gateway/occ/validatesystem
+  duracionCache: 2
+  habilitarCache: false
+  NASDominio: .cjf.gob.mx
+  local.settings.json: valor

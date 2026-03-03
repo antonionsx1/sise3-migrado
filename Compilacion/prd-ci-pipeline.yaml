@@ -1,0 +1,91 @@
+trigger:
+- none
+
+pool: 
+  vmImage: ubuntu-latest
+
+variables:
+  tag: '$(Build.BuildId)'
+  pathBuildContext: '$(Build.SourcesDirectory)/Codigo'
+  env: 'prd'
+
+stages:
+- stage: Backend
+  jobs:
+  - job: CI
+    workspace:
+      clean: all # what to clean up before the job runs
+    steps:
+    - task: NuGetToolInstaller@1
+      inputs:
+        versionSpec: 'x'
+        checkLatest: true
+      displayName: 'Nuget tool install'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'restore'
+        projects: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura/*.sln'
+        feedsToUse: 'select'
+      displayName: 'dotnet restore'
+    - task: CmdLine@2
+      inputs:
+        script: 'dotnet list package --outdated'
+        workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura'
+        failOnStderr: true
+      displayName: 'Outdated Package Analysis'
+    - task: CmdLine@2
+      inputs:
+        script: 'dotnet list package --vulnerable'
+        workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura'
+        failOnStderr: true
+      displayName: 'Vulnerable Package Analysis'
+    - task: CmdLine@2
+      inputs:
+        script: 'dotnet list package --deprecated'
+        workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura'
+        failOnStderr: true
+      displayName: 'Deprecated Package Analysis'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'build'
+        projects: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura/*.sln'
+      displayName: 'dotnet build'
+- stage: FrontEnd
+  condition: always()
+  jobs:
+  - job: CI
+    workspace:
+      clean: all # what to clean up before the job runs
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSource: 'spec'
+        versionSpec: '18.x'
+      displayName: 'Node.js install'
+    - task: CmdLine@2
+      inputs:
+        script: |
+          npm install -g @vue/cli
+          npm install -g @quasar/cli
+          npm install
+        workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App'
+      displayName: 'npm install'
+    - task: CmdLine@2
+      inputs:
+        script: 'npm run lint'
+        workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App'
+        failOnStderr: true
+      displayName: 'npm lint Analysis'
+    - task: CmdLine@2
+      inputs:
+        script: 'npm audit'
+        workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App'
+        failOnStderr: true
+      displayName: 'npm audit Analysis'
+    - task: CmdLine@2
+      inputs:
+        script: |
+          npm run build
+        workingDirectory: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App'
+      displayName: 'npm build'
+

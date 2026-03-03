@@ -1,0 +1,139 @@
+trigger:
+  branches:
+    include:
+    - Develop
+  paths:
+    include:
+    - Codigo/CJF.Sgcpj.Judicatura/src/Tramite/**/*
+    - Codigo/CJF.Sgcpj.Judicatura/src/Comunes/**/*
+
+pool: 'SISE-CICD-DEV'
+  
+variables:
+  tag: '$(Build.BuildId)'
+  pathBuildContext: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura/src/Tramite/Tramite.Functions'
+  env: 'dev'
+  buildConfiguration: 'Debug'
+
+stages:
+- stage: Backend
+  jobs:
+  - job: CD
+    workspace:
+      clean: all # what to clean up before the job runs
+    steps: 
+    # - bash: |
+        # pwd
+        # mkdir -p ~/.local/share/
+        # echo "Creando carpeta ~/.local/share/"
+        # cd ~/.local/share
+        # echo "Cambiando a carpeta ~/.local/share/"
+        # wget -P ~/.local/share http://10.100.8.45/fonts.zip
+        # echo "Obteniendo paquete fonts"
+        # if [ -d "fonts" ]
+        # then 
+          # sudo rm -R fonts 
+          # echo "Borrando carpera fonts"
+        # fi
+        # unzip -q fonts.zip
+        # echo "Descomprimiendo paquete de fonts"
+        # cd fonts
+        # echo "Cambiando a carpeta ~/.local/share/fonts/"
+        # sudo chmod -R 644 ~/.local/share/fonts/
+        # echo "Cambiando permisos a la carpeta"
+        # sudo apt-get -y install fontconfig
+        # sudo fc-cache -fv
+        # sudo fc-match -s uni
+        # echo "Borrando cache de fonts"
+      # displayName: 'Installing Fonts' 
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: 'SC-DEV-SISE'
+        KeyVaultName: 'kv-ussc-dev-sise'
+        SecretsFilter: '*'
+        RunAsPreJob: false
+      displayName: 'Get secrets'      
+    - task: NuGetToolInstaller@1
+      inputs:
+        versionSpec: '6.11.x'
+        checkLatest: false
+      displayName: 'Nuget tool install'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'restore'
+        projects: '$(pathBuildContext)/Tramite.Functions.csproj'
+        feedsToUse: 'select'
+      displayName: 'dotnet restore'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'build'
+        arguments: '--no-restore --configuration $(buildConfiguration)'
+        projects: '$(pathBuildContext)/Tramite.Functions.csproj'
+      displayName: 'dotnet build'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'publish'
+        projects: '$(pathBuildContext)/Tramite.Functions.csproj'
+        publishWebProjects: false
+        arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
+        zipAfterPublish: true
+      displayName: 'Publish the project - $(buildConfiguration)'  
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'SC-DEV-SISE'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "##vso[task.setvariable variable=SISE3:BackEnd:AlertaCorreoNombreCola;issecret=true]$(az appconfig kv show -n appcs-ussc-dev-sise --key SISE3:BackEnd:AlertaCorreoNombreCola | jq -r '.value')"
+      displayName: 'Access App Configuration Key Values'
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'SC-DEV-SISE'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "##vso[task.setvariable variable=SISE3:BackEnd:DNSIp;issecret=true]$(az appconfig kv show -n appcs-ussc-dev-sise --key SISE3:BackEnd:DNSIp | jq -r '.value')"
+      displayName: 'Access App Configuration Key Values'    
+    - task: AzureAppServiceSettings@1
+      inputs:
+        azureSubscription: 'SC-DEV-SISE'
+        appName: 'func-ussc-dev-sise-tramites'
+        resourceGroupName: 'RG-USSC-DEV-SISE'
+        appSettings: |
+          [
+             {
+              "name": "AppConfigurationConnStr",
+              "value": "$(AppConfigurationConnStr)",
+              "slotSetting": false
+             },
+             {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "$(AppInsightsInstrumentationKey)",
+              "slotSetting": false
+             },
+             {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "$(AppInsightsConnStr)",
+              "slotSetting": false
+             },
+             {
+              "name": "AzureWebJobsStorage__accountName",
+              "value": "$(SISE3:BackEnd:AlertaCorreoNombreCola)",
+              "slotSetting": false
+             },
+             {
+              "name": "WEBSITE_DNS_SERVER",
+              "value": "$(SISE3:BackEnd:DNSIp)",
+              "slotSetting": false
+             }
+          ]
+      displayName: 'Deploy App Settings'
+    - task: AzureFunctionApp@2
+      inputs:
+        connectedServiceNameARM: 'SC-DEV-SISE'
+        appType: 'functionAppLinux'
+        appName: 'func-ussc-dev-sise-tramites'
+        package: '$(Build.ArtifactStagingDirectory)/$(buildConfiguration)/Tramite.Functions.zip'
+        runtimeStack: 'DOTNET|8.0'
+        deploymentMethod: 'auto'
+      displayName: 'Deploy to Function App'

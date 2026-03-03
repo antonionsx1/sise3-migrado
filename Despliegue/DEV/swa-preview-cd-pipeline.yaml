@@ -1,0 +1,53 @@
+trigger:
+  branches:
+    include:
+      - Users/arma
+  paths:
+    include:
+      - Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App/**/*
+
+pool: "SISE-CICD-DEV"
+
+variables:
+  tag: "$(Build.BuildId)"
+  pathBuildContext: "$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App"
+  env: "dev"
+  buildConfiguration: "Debug"
+
+stages:
+  - stage: FrontEnd
+    jobs:
+      - job: CD
+        workspace:
+          clean: all # what to clean up before the job runs
+        steps:
+          - task: AzureKeyVault@2
+            inputs:
+              azureSubscription: "SC-DEV-SISE"
+              KeyVaultName: "kv-ussc-dev-sise"
+              SecretsFilter: "*"
+              RunAsPreJob: false
+            displayName: "Get secrets"
+          - task: NodeTool@0
+            inputs:
+              versionSource: "spec"
+              versionSpec: "18.x"
+            displayName: "Node.js install"
+          - task: CmdLine@2
+            inputs:
+              script: |
+                npm install -g @vue/cli
+                npm install -g @quasar/cli
+                npm install
+                npm run build:dev
+              workingDirectory: "$(pathBuildContext)"
+            displayName: "npm build"
+          - task: AzureStaticWebApp@0
+            inputs:
+              app_location: "/dist/pwa"
+              output_location: "/dist/pwa"
+              skip_app_build: true
+              skip_api_build: true
+              workingDirectory: "$(pathBuildContext)"
+              azure_static_web_apps_api_token: "$(StaticWebAppDeploymentToken)"
+              deployment_environment: "preview"

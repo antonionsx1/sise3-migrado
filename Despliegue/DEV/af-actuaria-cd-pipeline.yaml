@@ -1,0 +1,89 @@
+trigger:
+  branches:
+    include:
+    - Develop
+  paths:
+    include:
+    - Codigo/CJF.Sgcpj.Judicatura/src/Actuaria/**/*
+    - Codigo/CJF.Sgcpj.Judicatura/src/Comunes/**/*
+
+pool: 'SISE-CICD-DEV'
+  
+variables:
+  tag: '$(Build.BuildId)'
+  pathBuildContext: '$(Build.SourcesDirectory)/Codigo/CJF.Sgcpj.Judicatura/src/Actuaria/Actuaria.Functions'
+  env: 'dev'
+  buildConfiguration: 'Debug'
+
+stages:
+- stage: Backend
+  jobs:
+  - job: CD
+    workspace:
+      clean: all # what to clean up before the job runs
+    steps:
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: 'SC-DEV-SISE'
+        KeyVaultName: 'kv-ussc-dev-sise'
+        SecretsFilter: '*'
+        RunAsPreJob: false
+      displayName: 'Get secrets'  
+    - task: NuGetToolInstaller@1
+      inputs:
+        versionSpec: '6.11.x'
+        checkLatest: false
+      displayName: 'Nuget tool install'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'restore'
+        projects: '$(pathBuildContext)/Actuaria.Functions.csproj'
+        feedsToUse: 'select'
+      displayName: 'dotnet restore'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'build'
+        arguments: '--no-restore --configuration $(buildConfiguration)'
+        projects: '$(pathBuildContext)/Actuaria.Functions.csproj'
+      displayName: 'dotnet build'
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'publish'
+        projects: '$(pathBuildContext)/Actuaria.Functions.csproj'
+        publishWebProjects: false
+        arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
+        zipAfterPublish: true
+      displayName: 'Publish the project - $(buildConfiguration)'  
+    - task: AzureAppServiceSettings@1
+      inputs:
+        azureSubscription: 'SC-DEV-SISE'
+        appName: 'func-ussc-dev-sise-actuaria'
+        resourceGroupName: 'RG-USSC-DEV-SISE'
+        appSettings: |
+          [
+             {
+              "name": "AppConfigurationConnStr",
+              "value": "$(AppConfigurationConnStr)",
+              "slotSetting": false
+             },
+             {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "$(AppInsightsInstrumentationKey)",
+              "slotSetting": false
+             },
+             {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "$(AppInsightsConnStr)",
+              "slotSetting": false
+             }
+          ]
+      displayName: 'Deploy App Settings'
+    - task: AzureFunctionApp@2
+      inputs:
+        connectedServiceNameARM: 'SC-DEV-SISE'
+        appType: 'functionAppLinux'
+        appName: 'func-ussc-dev-sise-actuaria'
+        package: '$(Build.ArtifactStagingDirectory)/$(buildConfiguration)/Actuaria.Functions.zip'
+        runtimeStack: 'DOTNET|8.0'
+        deploymentMethod: 'auto'
+      displayName: 'Deploy to Function App'    
