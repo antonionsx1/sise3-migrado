@@ -14,29 +14,20 @@ namespace Agenda.Application.Agenda.Comando.AgendarAudiencia
 
         public ResultadoOperacion AgendarNuevaAudiencia(AgendarAudienciaRequest request)
         {
-            // ERROR ERR-AGN-002: Manejo de errores erróneo
-            // La validación de campos obligatorios no lanza excepción ni retorna
-            // resultado de error, simplemente continúa la ejecución
+            // CORRECCIÓN ERR-AGN-002: Manejo de errores corregido
+            // Las validaciones ahora retornan resultado de error correctamente
             if (string.IsNullOrEmpty(request.NumeroExpediente))
-            {
-                Console.WriteLine("Expediente requerido");
-                // Falta: return ResultadoOperacion.Error("El expediente es requerido");
-            }
+                return ResultadoOperacion.Error("ERR-AGN-002: El número de expediente es requerido");
 
             if (string.IsNullOrEmpty(request.TipoAudiencia))
-            {
-                Console.WriteLine("Tipo de audiencia requerido");
-                // Falta: return ResultadoOperacion.Error("El tipo de audiencia es requerido");
-            }
+                return ResultadoOperacion.Error("ERR-AGN-002: El tipo de audiencia es requerido");
 
-            // ERROR ERR-AGN-003: Operador lógico erróneo
-            // Se usa || en lugar de && para validar horario permitido (09:00 - 14:00)
-            // Con || cualquier hora pasa la validación porque siempre se cumple
-            // una de las dos condiciones
+            // CORRECCIÓN ERR-AGN-003: Operador lógico corregido
+            // Se usa && en lugar de || para validar correctamente el rango 09:00 - 14:00
             bool esCausaPenal = request.TipoAsunto == "Causa Penal";
             if (!esCausaPenal)
             {
-                bool horarioValido = request.FechaHora.Hour >= 9 || request.FechaHora.Hour < 14;
+                bool horarioValido = request.FechaHora.Hour >= 9 && request.FechaHora.Hour < 14;
                 if (!horarioValido)
                     return ResultadoOperacion.Error("ERR-AGN-003: Horario fuera del rango permitido (09:00 - 14:00)");
             }
@@ -60,15 +51,15 @@ namespace Agenda.Application.Agenda.Comando.AgendarAudiencia
             // Registrar audiencia
             var nuevaAudiencia = new Audiencia
             {
-                Id               = _audiencias.Count + 1,
-                NumeroExpediente = request.NumeroExpediente,
-                TipoAsunto       = request.TipoAsunto,
-                FechaHora        = request.FechaHora,
-                TipoAudiencia    = request.TipoAudiencia,
-                Secretario       = request.Secretario,
+                Id                = _audiencias.Count + 1,
+                NumeroExpediente  = request.NumeroExpediente,
+                TipoAsunto        = request.TipoAsunto,
+                FechaHora         = request.FechaHora,
+                TipoAudiencia     = request.TipoAudiencia,
+                Secretario        = request.Secretario,
                 PartesInteresadas = request.Partes,
-                PersonaQueAgenda = request.UsuarioAgenda,
-                Estado           = "Pendiente"
+                PersonaQueAgenda  = request.UsuarioAgenda,
+                Estado            = "Pendiente"
             };
 
             _audiencias.Add(nuevaAudiencia);
