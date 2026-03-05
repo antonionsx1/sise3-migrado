@@ -19,11 +19,11 @@ namespace Agenda.Application.Recordatorios.Comandos.InsertarRecordatorio
             if (string.IsNullOrWhiteSpace(request.Descripcion))
                 return ResultadoOperacion.Error("La descripción del recordatorio es requerida");
 
-            // ERROR ERR-REC-001: Operador lógico erróneo en validación de fecha
-            // Se usa || en lugar de && por lo que la validación nunca bloquea fechas inválidas
-            // ya que siempre se cumple al menos una de las dos condiciones
-            bool fechaValida = request.Fecha.Date >= DateTime.Today.Date ||
-                               request.Fecha.DayOfWeek != DayOfWeek.Saturday ||
+            // CORRECCIÓN ERR-REC-001: Operador lógico corregido
+            // Se usa && para que todas las condiciones se cumplan simultáneamente
+            // validando correctamente que la fecha sea hábil y no anterior al día actual
+            bool fechaValida = request.Fecha.Date >= DateTime.Today.Date &&
+                               request.Fecha.DayOfWeek != DayOfWeek.Saturday &&
                                request.Fecha.DayOfWeek != DayOfWeek.Sunday;
 
             if (!fechaValida)
