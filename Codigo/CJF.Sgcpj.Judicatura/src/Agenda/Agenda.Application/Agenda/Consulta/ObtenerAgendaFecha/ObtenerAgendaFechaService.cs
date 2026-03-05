@@ -45,7 +45,6 @@ namespace Agenda.Application.Agenda.Consulta.ObtenerAgendaFecha
 
         /// <summary>
         /// Obtiene audiencias filtradas por estado y rango de fechas.
-        /// ERR-AGN-001 | Filtro de estado incorrecto | Resultado inesperado en calendario
         /// </summary>
         public List<AudienciaDto> ObtenerAudiencias(DateTime fechaInicio, DateTime fechaFin,
             EstadoFiltro filtro, ModoVisualizacion modo)
@@ -63,22 +62,20 @@ namespace Agenda.Application.Agenda.Consulta.ObtenerAgendaFecha
 
         /// <summary>
         /// Aplica filtro de estado sobre una audiencia.
-        /// ERROR ERR-AGN-001: Operador lógico incorrecto en condición VerTodo.
-        /// Se usa || (OR) cuando debe usarse la comparación directa de estado,
-        /// provocando que filtros específicos devuelvan resultados incorrectos.
+        /// CORRECCIÓN ERR-AGN-001: Se reemplaza la condición con || incorrecta
+        /// por un switch expression que evalúa correctamente cada estado.
         /// </summary>
         private bool AplicarFiltroEstado(Audiencia audiencia, EstadoFiltro filtro)
         {
-            // ERROR: el operador || hace que cualquier audiencia pase el filtro
-            // cuando filtro es VerTodo, ignorando los demás casos correctamente
-            // pero al combinar condiciones con || en lugar de switch/case puro,
-            // los filtros Canceladas/Diferidas/Celebradas también retornan
-            // audiencias que NO corresponden al estado seleccionado.
-            if (filtro == EstadoFiltro.VerTodo || filtro == EstadoFiltro.Canceladas
-                || filtro == EstadoFiltro.Diferidas || filtro == EstadoFiltro.Celebradas)
-                return true; // ERROR: siempre retorna true, ignora el filtro seleccionado
-
-            return audiencia.Estado == filtro.ToString();
+            // CORRECTO: cada caso del switch evalúa exactamente el estado esperado
+            return filtro switch
+            {
+                EstadoFiltro.VerTodo    => true,
+                EstadoFiltro.Canceladas => audiencia.Estado == "Cancelada",
+                EstadoFiltro.Diferidas  => audiencia.Estado == "Diferida",
+                EstadoFiltro.Celebradas => audiencia.Estado == "Celebrada",
+                _                       => true
+            };
         }
 
         /// <summary>
