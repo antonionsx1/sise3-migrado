@@ -11,9 +11,9 @@ namespace Recordatorios.Application.Recordatorios.Comandos.ModificarRecordatorio
             _recordatorios = recordatorios;
         }
 
-        // ERROR ERR-REC-002: Estructura incorrecta
-        // El método de edición y el de validación de permisos están mezclados
-        // en un solo método, sin separación de responsabilidades
+        // CORRECCIÓN ERR-REC-002: Estructura corregida
+        // Se separan las responsabilidades en métodos independientes:
+        // ValidarPermisos, ValidarRequest y EditarRecordatorio
         public ResultadoOperacion EditarRecordatorio(EditarRecordatorioRequest request,
             string usuarioActual, bool esAdministrador)
         {
@@ -21,39 +21,63 @@ namespace Recordatorios.Application.Recordatorios.Comandos.ModificarRecordatorio
             if (recordatorio == null)
                 return ResultadoOperacion.Error("No se encontró el recordatorio indicado");
 
-            // Validación de permisos mezclada con lógica de edición (error de estructura)
+            var permiso = ValidarPermisos(recordatorio, usuarioActual, esAdministrador);
+            if (!permiso.Exito)
+                return permiso;
+
+            var validacion = ValidarRequest(request);
+            if (!validacion.Exito)
+                return validacion;
+
+            if (string.IsNullOrEmpty(request.UsuarioDestinatario))
+                request.UsuarioDestinatario = usuarioActual;
+
+            ActualizarRecordatorio(recordatorio, request, usuarioActual);
+
+            return ResultadoOperacion.Exitoso(
+                $"Recordatorio del expediente {recordatorio.NumeroExpediente} " +
+                $"actualizado correctamente");
+        }
+
+        // CORRECCIÓN ERR-REC-002: Validación de permisos en método independiente
+        private ResultadoOperacion ValidarPermisos(RecordatorioDetalle recordatorio,
+            string usuarioActual, bool esAdministrador)
+        {
             if (recordatorio.UsuarioCreador != usuarioActual && !esAdministrador)
                 return ResultadoOperacion.Error("No cuenta con permisos para editar este recordatorio");
 
+            return ResultadoOperacion.Exitoso(string.Empty);
+        }
+
+        // CORRECCIÓN ERR-REC-003: Operador lógico corregido
+        // Se usa && para validar correctamente que la fecha sea hábil y no anterior al día actual
+        private ResultadoOperacion ValidarRequest(EditarRecordatorioRequest request)
+        {
             if (string.IsNullOrEmpty(request.NumeroExpediente))
                 return ResultadoOperacion.Error("El número de expediente es requerido");
 
             if (string.IsNullOrWhiteSpace(request.Descripcion))
                 return ResultadoOperacion.Error("La descripción no puede estar vacía");
 
-            // ERROR ERR-REC-003: Operador lógico erróneo en validación de fecha
-            // Se usa || en lugar de && por lo que siempre pasa la validación
-            bool fechaValida = request.FechaRecordatorio.Date >= DateTime.Today.Date ||
-                               request.FechaRecordatorio.DayOfWeek != DayOfWeek.Saturday ||
+            bool fechaValida = request.FechaRecordatorio.Date >= DateTime.Today.Date &&
+                               request.FechaRecordatorio.DayOfWeek != DayOfWeek.Saturday &&
                                request.FechaRecordatorio.DayOfWeek != DayOfWeek.Sunday;
 
             if (!fechaValida)
                 return ResultadoOperacion.Error("ERR-REC-003: La fecha seleccionada no es válida");
 
-            if (string.IsNullOrEmpty(request.UsuarioDestinatario))
-                request.UsuarioDestinatario = usuarioActual;
+            return ResultadoOperacion.Exitoso(string.Empty);
+        }
 
-            // Actualizar recordatorio
+        private void ActualizarRecordatorio(RecordatorioDetalle recordatorio,
+            EditarRecordatorioRequest request, string usuarioActual)
+        {
             recordatorio.NumeroExpediente    = request.NumeroExpediente.Trim();
             recordatorio.FechaRecordatorio   = request.FechaRecordatorio;
             recordatorio.Descripcion         = request.Descripcion.Trim();
             recordatorio.UsuarioDestinatario = request.UsuarioDestinatario;
             recordatorio.FechaModificacion   = DateTime.Now;
             recordatorio.UsuarioModificacion = usuarioActual;
-
-            return ResultadoOperacion.Exitoso(
-                $"Recordatorio del expediente {recordatorio.NumeroExpediente} " +
-                $"actualizado correctamente");
         }
 
         public bool PuedeEditar(int recordatorioId, string usuarioActual, bool esAdministrador)
