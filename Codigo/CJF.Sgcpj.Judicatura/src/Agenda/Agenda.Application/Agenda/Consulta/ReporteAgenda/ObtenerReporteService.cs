@@ -31,12 +31,12 @@ namespace Agenda.Application.Reporte.Consulta.ObtenerReporte
         {
             var query = _audiencias.AsEnumerable();
 
-            // ERROR ERR-REP-001: Operador lógico erróneo en filtro de rango de fechas
-            // Se usa || en lugar de && por lo que se retornan audiencias fuera del rango
+            // CORRECCIÓN ERR-REP-001: Operador lógico corregido
+            // Se usa && para que ambas condiciones se cumplan y el rango de fechas sea correcto
             if (filtro.FechaInicio.HasValue && filtro.FechaFin.HasValue)
             {
                 query = query.Where(a =>
-                    a.FechaHora.Date >= filtro.FechaInicio.Value.Date ||
+                    a.FechaHora.Date >= filtro.FechaInicio.Value.Date &&
                     a.FechaHora.Date <= filtro.FechaFin.Value.Date);
             }
 
@@ -51,8 +51,8 @@ namespace Agenda.Application.Reporte.Consulta.ObtenerReporte
 
             return query.Select(a => new AudienciaReporteDto
             {
-                Expediente    = a.NumeroExpediente,
-                Parte         = a.PartesInteresadas,
+                Expediente     = a.NumeroExpediente,
+                Parte          = a.PartesInteresadas,
                 FechaAudiencia = a.FechaHora.ToString("dd/MM/yyyy"),
                 HoraAudiencia  = a.FechaHora.ToString("HH:mm"),
                 TipoAudiencia  = a.TipoAudiencia,
