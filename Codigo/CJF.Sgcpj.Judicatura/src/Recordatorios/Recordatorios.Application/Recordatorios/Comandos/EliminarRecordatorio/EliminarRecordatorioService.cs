@@ -2,9 +2,9 @@ using Agenda.Application.Common.Models;
 
 namespace Recordatorios.Application.Recordatorios.Comandos.EliminarRecordatorio
 {
-    // ERROR ERR-REC-004: Estructura incorrecta
-    // La validación de permisos, confirmación y eliminación están
-    // mezcladas en un solo método sin separación de responsabilidades
+    // CORRECCIÓN ERR-REC-004: Estructura corregida
+    // Se separan las responsabilidades en métodos independientes:
+    // ValidarPermisos, SolicitarConfirmacion y Eliminar
     public class EliminarRecordatorioService
     {
         private readonly List<RecordatorioDetalle> _recordatorios;
@@ -21,20 +21,43 @@ namespace Recordatorios.Application.Recordatorios.Comandos.EliminarRecordatorio
             if (recordatorio == null)
                 return ResultadoOperacion.Error("No se encontró el recordatorio indicado");
 
-            // ERROR ERR-REC-005: Operador lógico erróneo en validación de permisos
-            // Se usa && en lugar de || por lo que solo el usuario que creó Y es destinatario
-            // puede eliminar, cuando debería poder hacerlo cualquiera de los dos por separado
-            bool puedeEliminar = recordatorio.UsuarioCreador == usuarioActual &&
-                                 recordatorio.UsuarioDestinatario == usuarioActual &&
+            var permiso = ValidarPermisos(recordatorio, usuarioActual, esAdministrador);
+            if (!permiso.Exito)
+                return permiso;
+
+            var confirmacion = ValidarConfirmacion(confirmado);
+            if (!confirmacion.Exito)
+                return confirmacion;
+
+            return Eliminar(recordatorio);
+        }
+
+        // CORRECCIÓN ERR-REC-004: Validación de permisos en método independiente
+        // CORRECCIÓN ERR-REC-005: Operador lógico corregido
+        // Se usa || para que cualquiera de los tres perfiles pueda eliminar por separado
+        private ResultadoOperacion ValidarPermisos(RecordatorioDetalle recordatorio,
+            string usuarioActual, bool esAdministrador)
+        {
+            bool puedeEliminar = recordatorio.UsuarioCreador == usuarioActual ||
+                                 recordatorio.UsuarioDestinatario == usuarioActual ||
                                  esAdministrador;
 
             if (!puedeEliminar)
                 return ResultadoOperacion.Error("No cuenta con permisos para eliminar este recordatorio");
 
-            // Confirmación y eliminación mezcladas con validación de permisos (error estructura)
+            return ResultadoOperacion.Exitoso(string.Empty);
+        }
+
+        private ResultadoOperacion ValidarConfirmacion(bool confirmado)
+        {
             if (!confirmado)
                 return ResultadoOperacion.Error("Se requiere confirmación para eliminar el recordatorio");
 
+            return ResultadoOperacion.Exitoso(string.Empty);
+        }
+
+        private ResultadoOperacion Eliminar(RecordatorioDetalle recordatorio)
+        {
             _recordatorios.Remove(recordatorio);
 
             return ResultadoOperacion.Exitoso(
