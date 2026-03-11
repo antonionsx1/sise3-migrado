@@ -34,7 +34,6 @@ namespace Agenda.Application.Agenda.Comandos.EliminarAudiencia
 
         private ResultadoOperacion ValidarEliminacion(Audiencia audiencia, string numeroExpediente)
         {
-            // Validar que sea la última audiencia del expediente
             var ultimaAudiencia = _audiencias
                 .Where(a => a.NumeroExpediente == numeroExpediente)
                 .OrderByDescending(a => a.FechaHora)
@@ -44,20 +43,17 @@ namespace Agenda.Application.Agenda.Comandos.EliminarAudiencia
                 return ResultadoOperacion.Error(
                     "Solo se puede eliminar la última audiencia registrada del expediente");
 
-            // Validar que no sea fecha pasada
             if (audiencia.FechaHora.Date < DateTime.Today)
                 return ResultadoOperacion.Error(
                     "No se pueden eliminar audiencias con fecha anterior a la actual");
 
-            // Validar que no esté Celebrada
             if (audiencia.Estado == "Celebrada")
                 return ResultadoOperacion.Error(
                     "Las audiencias en estado Celebrada no pueden eliminarse");
 
-            // ERROR ERR-AGN-006: Operador lógico erróneo en validación de roles
-            // Se usa && en lugar de || por lo que solo puede eliminar
-            // quien sea Titular Y Secretario al mismo tiempo, lo cual es imposible
-            bool rolPermitido = audiencia.PersonaQueAgenda == "Titular" &&
+            // CORRECCIÓN ERR-AGN-006: Operador lógico corregido
+            // Se usa || para que el Titular O el Secretario puedan eliminar por separado
+            bool rolPermitido = audiencia.PersonaQueAgenda == "Titular" ||
                                 audiencia.PersonaQueAgenda == "Secretario";
 
             if (!rolPermitido)
