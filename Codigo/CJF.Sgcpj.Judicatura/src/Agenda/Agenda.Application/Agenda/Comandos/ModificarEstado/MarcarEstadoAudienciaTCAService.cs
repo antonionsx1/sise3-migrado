@@ -15,11 +15,17 @@ namespace Agenda.Application.Agenda.Comandos.ModificarEstadoAudienciaTCA
         public ResultadoOperacion MarcarEstado(string numeroExpediente,
             int audienciaId, string nuevoEstado)
         {
-            // ERROR ERR-TCA-003: Comentario incorrecto
-            // El comentario indica que se validan todos los estados pero
-            // el código no incluye "Suspendida" que es un estado válido según la HU
-            // Estados válidos: Cancelada, Diferida, Celebrada, Suspendida (otros)
-            var estadosValidos = new[] { "Cancelada", "Diferida", "Celebrada" };
+            // CORRECCIÓN ERR-TCA-003: Comentario corregido
+            // Se agregan todos los estados válidos incluyendo "Suspendida" y otros
+            // Estados válidos: Cancelada, Diferida, Celebrada,
+            // Procedimiento suspendido, Sin efectos, Sobreseimiento fuera de Audiencia
+            var estadosValidos = new[]
+            {
+                "Cancelada", "Diferida", "Celebrada",
+                "Procedimiento suspendido", "Sin efectos",
+                "Sobreseimiento fuera de Audiencia"
+            };
+
             if (!estadosValidos.Contains(nuevoEstado))
                 return ResultadoOperacion.Error($"El estado '{nuevoEstado}' no es válido");
 
@@ -43,9 +49,9 @@ namespace Agenda.Application.Agenda.Comandos.ModificarEstadoAudienciaTCA
                 $"fue actualizado a {nuevoEstado}");
         }
 
-        // ERROR ERR-TCA-004: Operador lógico erróneo en ObtenerColorEstado
-        // Se usa && en lugar de || en la condición de "Otros" estados
-        // por lo que nunca se asigna el color azul correctamente
+        // CORRECCIÓN ERR-TCA-004: Operador lógico corregido
+        // Se usa || en lugar de && para que cualquiera de los estados "otros"
+        // reciba el color azul correctamente
         public string ObtenerColorEstado(string estado)
         {
             if (estado == "Cancelada")
@@ -57,9 +63,8 @@ namespace Agenda.Application.Agenda.Comandos.ModificarEstadoAudienciaTCA
             if (estado == "Celebrada")
                 return "verde";
 
-            // ERROR: usa && por lo que la condición nunca se cumple
-            if (estado == "Procedimiento suspendido" &&
-                estado == "Sin efectos" &&
+            if (estado == "Procedimiento suspendido" ||
+                estado == "Sin efectos" ||
                 estado == "Sobreseimiento fuera de Audiencia")
                 return "azul";
 
