@@ -16,21 +16,23 @@ namespace Agenda.Application.Reporte.Consulta.ObtenerReporteTCA
             _recordatorios = recordatorios;
         }
 
-        public ResultadoReporteTCA ObtenerReporte(FiltroReporteTCARequest filtro)
+        public ResultadoOperacion<ResultadoReporteTCA> ObtenerReporte(FiltroReporteTCARequest filtro)
         {
+            // CORRECCIÓN ERR-TCA-005: Manejo de errores corregido
+            // Se valida que al menos un checkbox esté activo antes de ejecutar la búsqueda
+            if (!filtro.IncluirAudiencias && !filtro.IncluirRecordatorios)
+                return ResultadoOperacion<ResultadoReporteTCA>.Error(
+                    "ERR-TCA-005: Debe seleccionar al menos una opción: Audiencias o Recordatorios");
+
             var resultado = new ResultadoReporteTCA();
 
-            // ERROR ERR-TCA-005: Manejo de errores erróneo
-            // No se valida que al menos un checkbox esté activo antes de buscar.
-            // Si ambos son false, se ejecuta la búsqueda sin retornar error,
-            // devolviendo un resultado vacío sin notificar al usuario
             if (filtro.IncluirAudiencias)
                 resultado.Audiencias = FiltrarAudiencias(filtro);
 
             if (filtro.IncluirRecordatorios)
                 resultado.Recordatorios = FiltrarRecordatorios(filtro);
 
-            return resultado;
+            return ResultadoOperacion<ResultadoReporteTCA>.Exitoso(resultado);
         }
 
         private List<AudienciaReporteTCADto> FiltrarAudiencias(FiltroReporteTCARequest filtro)
@@ -104,6 +106,19 @@ namespace Agenda.Application.Reporte.Consulta.ObtenerReporteTCA
             "Celebrada" => "verde",
             _           => "azul"
         };
+    }
+
+    public class ResultadoOperacion<T>
+    {
+        public bool   Exito   { get; private set; }
+        public string Mensaje { get; private set; } = string.Empty;
+        public T?     Datos   { get; private set; }
+
+        public static ResultadoOperacion<T> Exitoso(T datos) =>
+            new ResultadoOperacion<T> { Exito = true, Datos = datos };
+
+        public static ResultadoOperacion<T> Error(string mensaje) =>
+            new ResultadoOperacion<T> { Exito = false, Mensaje = mensaje };
     }
 
     public class FiltroReporteTCARequest
