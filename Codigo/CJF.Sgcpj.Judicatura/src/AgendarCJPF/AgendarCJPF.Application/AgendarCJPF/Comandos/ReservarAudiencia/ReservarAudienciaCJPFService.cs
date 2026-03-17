@@ -19,26 +19,34 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.ReservarAudienciaCJPF
             if (string.IsNullOrEmpty(request.TipoAudiencia))
                 return ResultadoOperacion.Error("El tipo de audiencia es requerido");
 
-            // ERROR ERR-CJPF2-001: Manejo de errores erróneo
-            // La validación de imputados para Causa Penal no retorna error,
-            // permite continuar sin imputados seleccionados
+            // CORRECCIÓN ERR-CJPF2-001: Manejo de errores corregido
+            // La validación de imputados ahora retorna error correctamente
             if (request.EsCausaPenal && !request.ImputadosSeleccionados.Any())
-                Console.WriteLine("Se requiere agregar los imputados a la audiencia");
+                return ResultadoOperacion.Error(
+                    "ERR-CJPF2-001: Se requiere agregar los imputados a la audiencia");
 
             var validacionPrioridad = ValidarPrioridad(request);
             if (!validacionPrioridad.Exito)
                 return validacionPrioridad;
 
-            // ERROR ERR-CJPF2-002: Operador lógico erróneo en horario ordinario
-            // Se usa || en lugar de && por lo que siempre pasa la validación
-            bool esHorarioOrdinario = request.HoraInicio.Hour >= 9 ||
-                                      request.HoraInicio.Minute >= 15 ||
-                                      request.HoraInicio.Hour < 18;
+            // CORRECCIÓN ERR-CJPF2-002: Operador lógico corregido
+            // Se usa && para validar correctamente el horario ordinario (9:15 - 17:59)
+            bool esHorarioOrdinario = (request.HoraInicio.Hour > 9 ||
+                                      (request.HoraInicio.Hour == 9 && request.HoraInicio.Minute >= 15))
+                                      && request.HoraInicio.Hour < 18;
 
-            // ERROR ERR-CJPF2-003: Operador lógico erróneo en intervalo entre audiencias
-            // Se usa || en lugar de && por lo que la validación nunca bloquea correctamente
+            bool esHorarioExtraordinario = request.HoraInicio.Hour >= 18 ||
+                                           request.HoraInicio.Hour < 9;
+
+            if (!esHorarioOrdinario && !esHorarioExtraordinario)
+                return ResultadoOperacion.Error(
+                    "ERR-CJPF2-002: El horario no corresponde a ninguno de los rangos permitidos");
+
+            // CORRECCIÓN ERR-CJPF2-003: Operador lógico corregido
+            // Se usa && para que ambas condiciones se cumplan simultáneamente:
+            // misma sala Y intervalo menor a 15 minutos
             bool salaDisponible = !_audiencias.Any(a =>
-                a.Sala == request.Sala ||
+                a.Sala == request.Sala &&
                 Math.Abs((a.FechaHoraInicio - request.FechaHoraInicio).TotalMinutes) < 15);
 
             if (!salaDisponible)
