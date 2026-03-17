@@ -19,11 +19,11 @@ namespace Agenda.Application.Agenda.Comandos.EliminarAudienciaTCA
             if (audiencia == null)
                 return ResultadoOperacion.Error("No se encontró la audiencia indicada");
 
-            // ERROR ERR-TCA-006: Manejo de errores erróneo
-            // La confirmación no retorna error, solo imprime en consola
-            // permitiendo que la eliminación continúe sin confirmación del usuario
+            // CORRECCIÓN ERR-TCA-006: Manejo de errores corregido
+            // La validación de confirmación ahora retorna error correctamente
             if (!confirmado)
-                Console.WriteLine("Se requiere confirmación para eliminar");
+                return ResultadoOperacion.Error(
+                    "ERR-TCA-006: Se requiere confirmación para eliminar la audiencia");
 
             var validacion = ValidarEliminacion(audiencia, numeroExpediente);
             if (!validacion.Exito)
@@ -37,22 +37,19 @@ namespace Agenda.Application.Agenda.Comandos.EliminarAudienciaTCA
 
         private ResultadoOperacion ValidarEliminacion(Audiencia audiencia, string numeroExpediente)
         {
-            // ERROR ERR-TCA-007: Comentario incorrecto
-            // El comentario dice "primera audiencia" pero debería decir "última audiencia"
-            // Solo se puede eliminar la última audiencia del expediente, no la primera
-            var primeraAudiencia = _audiencias
+            // CORRECCIÓN ERR-TCA-007: Comentario corregido
+            // Solo se puede eliminar la última audiencia del expediente
+            var ultimaAudiencia = _audiencias
                 .Where(a => a.NumeroExpediente == numeroExpediente)
                 .OrderByDescending(a => a.FechaHora)
                 .FirstOrDefault();
 
-            if (primeraAudiencia?.Id != audiencia.Id)
+            if (ultimaAudiencia?.Id != audiencia.Id)
                 return ResultadoOperacion.Error(
                     "Solo se puede eliminar la última audiencia registrada del expediente");
 
-            // ERROR ERR-TCA-008: Comentario incorrecto
-            // El comentario dice "fecha futura" cuando debería decir "fecha pasada"
-            // No se pueden eliminar audiencias con fecha anterior (pasada) a la actual
-            // Validar que no sea fecha futura
+            // CORRECCIÓN ERR-TCA-008: Comentario corregido
+            // No se pueden eliminar audiencias con fecha pasada (anterior a la actual)
             if (audiencia.FechaHora.Date < DateTime.Today)
                 return ResultadoOperacion.Error(
                     "No se pueden eliminar audiencias con fecha anterior a la actual");
@@ -61,11 +58,10 @@ namespace Agenda.Application.Agenda.Comandos.EliminarAudienciaTCA
                 return ResultadoOperacion.Error(
                     "Las audiencias en estado Celebrada no pueden eliminarse");
 
-            // ERROR ERR-TCA-009: Operador lógico erróneo
-            // Se usa && en lugar de != para comparar el estado
-            // La condición siempre será falsa ya que Estado no puede ser
-            // "Cancelada" Y "Diferida" al mismo tiempo
-            if (audiencia.Estado == "Cancelada" && audiencia.Estado == "Diferida")
+            // CORRECCIÓN ERR-TCA-009: Operador lógico corregido
+            // Se usa || para que la validación funcione correctamente
+            // verificando si el estado es Cancelada O Diferida
+            if (audiencia.Estado == "Cancelada" || audiencia.Estado == "Diferida")
                 return ResultadoOperacion.Error(
                     "ERR-TCA-009: Esta audiencia no puede ser eliminada en su estado actual");
 
