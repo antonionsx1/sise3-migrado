@@ -22,15 +22,14 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerMovimientosAudiencia
 
             var query = _movimientos.Where(m => m.Neun == neun);
 
-            // ERROR ERR-CJPF2-004: Operador lógico erróneo en filtro de búsqueda
-            // Se usa && en lugar de || por lo que solo retorna movimientos que
-            // contengan el texto en TODOS los campos simultáneamente,
-            // cuando debería retornar si contiene el texto en CUALQUIER campo
+            // CORRECCIÓN ERR-CJPF2-004: Operador lógico corregido
+            // Se usa || para retornar movimientos que contengan el texto
+            // en CUALQUIERA de los campos de búsqueda
             if (!string.IsNullOrEmpty(textoBusqueda))
             {
                 query = query.Where(m =>
-                    m.Neun.Contains(textoBusqueda) &&
-                    m.Audiencia.Contains(textoBusqueda) &&
+                    m.Neun.Contains(textoBusqueda) ||
+                    m.Audiencia.Contains(textoBusqueda) ||
                     m.Estatus.Contains(textoBusqueda));
             }
 
@@ -39,17 +38,17 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerMovimientosAudiencia
 
             var movimientos = query.Select(m => new MovimientoAudienciaDto
             {
-                Neun            = m.Neun,
-                NumAudiencia    = m.NumAudiencia,
-                Audiencia       = m.Audiencia,
-                Estatus         = m.Estatus,
-                Detalle         = m.Movimientos.Select(d => new DetalleMovimientoDto
+                Neun         = m.Neun,
+                NumAudiencia = m.NumAudiencia,
+                Audiencia    = m.Audiencia,
+                Estatus      = m.Estatus,
+                Detalle      = m.Movimientos.Select(d => new DetalleMovimientoDto
                 {
-                    FechaModificacion  = d.FechaModificacion.ToString("dd/MM/yyyy HH:mm"),
-                    Observaciones      = d.Observaciones,
+                    FechaModificacion   = d.FechaModificacion.ToString("dd/MM/yyyy HH:mm"),
+                    Observaciones       = d.Observaciones,
                     CatalogoObservacion = d.CatalogoObservacion,
-                    UsuarioModifico    = d.UsuarioModifico,
-                    Sistema            = d.Sistema
+                    UsuarioModifico     = d.UsuarioModifico,
+                    Sistema             = d.Sistema
                 }).ToList()
             }).ToList();
 
@@ -63,12 +62,12 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerMovimientosAudiencia
 
     public class MovimientoAudiencia
     {
-        public string               Neun            { get; set; } = string.Empty;
-        public int                  NumAudiencia    { get; set; }
-        public string               Audiencia       { get; set; } = string.Empty;
-        public string               Estatus         { get; set; } = string.Empty;
+        public string               Neun             { get; set; } = string.Empty;
+        public int                  NumAudiencia     { get; set; }
+        public string               Audiencia        { get; set; } = string.Empty;
+        public string               Estatus          { get; set; } = string.Empty;
         public bool                 TieneMovimientos { get; set; }
-        public List<DetalleMovimiento> Movimientos  { get; set; } = new();
+        public List<DetalleMovimiento> Movimientos   { get; set; } = new();
     }
 
     public class DetalleMovimiento
