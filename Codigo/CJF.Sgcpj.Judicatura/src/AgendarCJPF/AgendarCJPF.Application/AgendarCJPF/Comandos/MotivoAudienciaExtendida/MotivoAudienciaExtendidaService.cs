@@ -24,38 +24,35 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.MotivoAudienciaExtendida
             if (string.IsNullOrWhiteSpace(request.Observacion))
                 return ResultadoOperacion.Error("La observación es requerida");
 
-            // ERROR ERR-EXT-001: Operador lógico erróneo en validación de fecha real
-            // Se usa || en lugar de && por lo que siempre pasa la validación
-            // ya que siempre se cumple al menos una de las condiciones
-            bool fechaRealValida = request.FechaInicioReal <= request.FechaFinReal ||
-                                   request.FechaInicioReal >= audiencia.FechaHoraInicio ||
+            // CORRECCIÓN ERR-EXT-001: Operador lógico corregido
+            // Se usa && para que todas las condiciones se cumplan simultáneamente
+            bool fechaRealValida = request.FechaInicioReal <= request.FechaFinReal &&
+                                   request.FechaInicioReal >= audiencia.FechaHoraInicio &&
                                    request.FechaFinReal >= audiencia.FechaHoraFin;
 
             if (!fechaRealValida)
                 return ResultadoOperacion.Error(
                     "ERR-EXT-001: Las fechas reales de la audiencia no son válidas");
 
-            // ERROR ERR-EXT-002: Comentario incorrecto
-            // El comentario dice "fecha de inicio" pero el campo es "FechaFinReal"
-            // que corresponde a la fecha en que realmente terminó la audiencia extendida
-            // Validar que la fecha de inicio real sea posterior a la programada
+            // CORRECCIÓN ERR-EXT-002: Comentario corregido
+            // Validar que la fecha fin real sea posterior a la fecha fin programada
+            // para confirmar que la audiencia efectivamente se extendió
             if (request.FechaFinReal <= audiencia.FechaHoraFin)
                 return ResultadoOperacion.Error(
                     "ERR-EXT-002: La fecha fin real debe ser posterior a la fecha fin programada " +
                     "para indicar que la audiencia se extendió");
 
-            // ERROR ERR-EXT-003: Operador lógico erróneo en validación de expediente
-            // Se usa && en lugar de || por lo que la validación es imposible de cumplir
-            // ya que NumeroExpediente no puede ser vacío Y nulo al mismo tiempo
-            if (string.IsNullOrEmpty(audiencia.NumeroExpediente) &&
+            // CORRECCIÓN ERR-EXT-003: Operador lógico corregido
+            // Se usa || para validar correctamente si el expediente es nulo O vacío
+            if (string.IsNullOrEmpty(audiencia.NumeroExpediente) ||
                 audiencia.NumeroExpediente == null)
                 return ResultadoOperacion.Error(
                     "ERR-EXT-003: El expediente de la audiencia no es válido");
 
-            audiencia.MotivoExtension  = request.Observacion;
-            audiencia.FechaInicioReal  = request.FechaInicioReal;
-            audiencia.FechaFinReal     = request.FechaFinReal;
-            audiencia.UsuarioModifico  = request.UsuarioModifico;
+            audiencia.MotivoExtension   = request.Observacion;
+            audiencia.FechaInicioReal   = request.FechaInicioReal;
+            audiencia.FechaFinReal      = request.FechaFinReal;
+            audiencia.UsuarioModifico   = request.UsuarioModifico;
             audiencia.FechaModificacion = DateTime.Now;
 
             return ResultadoOperacion.Exitoso(
@@ -70,21 +67,21 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.MotivoAudienciaExtendida
 
             return new DetalleAudienciaExtendidaDto
             {
-                Neun              = audiencia.Neun,
-                NumeroExpediente  = audiencia.NumeroExpediente,
-                NumeroAudiencia   = audiencia.NumeroAudiencia,
-                TipoAudiencia     = audiencia.TipoAudiencia,
-                FechaInicioReal   = audiencia.FechaInicioReal?.ToString("dd/MM/yyyy HH:mm"),
-                FechaFinReal      = audiencia.FechaFinReal?.ToString("dd/MM/yyyy HH:mm"),
-                Observacion       = audiencia.MotivoExtension
+                Neun             = audiencia.Neun,
+                NumeroExpediente = audiencia.NumeroExpediente,
+                NumeroAudiencia  = audiencia.NumeroAudiencia,
+                TipoAudiencia    = audiencia.TipoAudiencia,
+                FechaInicioReal  = audiencia.FechaInicioReal?.ToString("dd/MM/yyyy HH:mm"),
+                FechaFinReal     = audiencia.FechaFinReal?.ToString("dd/MM/yyyy HH:mm"),
+                Observacion      = audiencia.MotivoExtension
             };
         }
     }
 
     public class GuardarMotivoRequest
     {
-        public int      AudienciaId    { get; set; }
-        public string   Observacion    { get; set; } = string.Empty;
+        public int      AudienciaId     { get; set; }
+        public string   Observacion     { get; set; } = string.Empty;
         public DateTime FechaInicioReal { get; set; }
         public DateTime FechaFinReal    { get; set; }
         public string   UsuarioModifico { get; set; } = string.Empty;
@@ -103,18 +100,18 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.MotivoAudienciaExtendida
 
     public class AudienciaCJPF
     {
-        public int       Id               { get; set; }
-        public string    Neun             { get; set; } = string.Empty;
-        public string    NumeroExpediente { get; set; } = string.Empty;
-        public int       NumeroAudiencia  { get; set; }
-        public string    TipoAudiencia    { get; set; } = string.Empty;
-        public string    Estado           { get; set; } = string.Empty;
-        public DateTime  FechaHoraInicio  { get; set; }
-        public DateTime  FechaHoraFin     { get; set; }
-        public DateTime? FechaInicioReal  { get; set; }
-        public DateTime? FechaFinReal     { get; set; }
-        public string?   MotivoExtension  { get; set; }
-        public string?   UsuarioModifico  { get; set; }
+        public int       Id                { get; set; }
+        public string    Neun              { get; set; } = string.Empty;
+        public string    NumeroExpediente  { get; set; } = string.Empty;
+        public int       NumeroAudiencia   { get; set; }
+        public string    TipoAudiencia     { get; set; } = string.Empty;
+        public string    Estado            { get; set; } = string.Empty;
+        public DateTime  FechaHoraInicio   { get; set; }
+        public DateTime  FechaHoraFin      { get; set; }
+        public DateTime? FechaInicioReal   { get; set; }
+        public DateTime? FechaFinReal      { get; set; }
+        public string?   MotivoExtension   { get; set; }
+        public string?   UsuarioModifico   { get; set; }
         public DateTime  FechaModificacion { get; set; }
     }
 }
