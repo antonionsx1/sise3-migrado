@@ -17,19 +17,22 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AgregarResolucionAudiencia
             if (audiencia == null)
                 return ResultadoOperacion.Error("No se encontró la audiencia indicada");
 
-            // ERROR ERR-RES-001: Manejo de errores erróneo
-            // No se valida que la audiencia esté en estado "Celebrada"
-            // antes de agregar resoluciones, permite agregar resoluciones
-            // a audiencias en cualquier estado
+            // CORRECCIÓN ERR-RES-001: Manejo de errores corregido
+            // Se valida que la audiencia esté en estado "Celebrada"
+            // antes de permitir agregar resoluciones
+            if (audiencia.Estado != "Celebrada")
+                return ResultadoOperacion.Error(
+                    "ERR-RES-001: Solo se pueden agregar resoluciones a audiencias en estado Celebrada");
+
             if (string.IsNullOrEmpty(request.ResolucionId))
                 return ResultadoOperacion.Error("Debe seleccionar una resolución");
 
             var resolucion = new Resolucion
             {
-                Id          = audiencia.Resoluciones.Count + 1,
-                ResolucionId = request.ResolucionId,
-                Descripcion = request.Descripcion,
-                FechaAgrego = DateTime.Now,
+                Id            = audiencia.Resoluciones.Count + 1,
+                ResolucionId  = request.ResolucionId,
+                Descripcion   = request.Descripcion,
+                FechaAgrego   = DateTime.Now,
                 UsuarioAgrego = request.UsuarioAgrego
             };
 
@@ -80,8 +83,8 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AgregarResolucionAudiencia
 
     public class AudienciaCJPF
     {
-        public int    Id           { get; set; }
-        public string Estado       { get; set; } = string.Empty;
+        public int    Id               { get; set; }
+        public string Estado           { get; set; } = string.Empty;
         public string NumeroExpediente { get; set; } = string.Empty;
         public List<Resolucion> Resoluciones { get; set; } = new();
     }
