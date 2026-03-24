@@ -45,10 +45,10 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.ResolucionSinAudiencia
                 TipoResolucion = request.TipoResolucion == "Innominada"
                     ? request.Descripcion ?? request.TipoResolucion
                     : request.TipoResolucion,
-                FechaInicio    = request.FechaInicio,
-                FechaFin       = request.FechaFin,
-                JuezAsignado   = request.JuezId,
-                Estado         = "Asignada",
+                FechaInicio         = request.FechaInicio,
+                FechaFin            = request.FechaFin,
+                JuezAsignado        = request.JuezId,
+                Estado              = "Asignada",
                 GeneraExclusionJuez = true
             };
 
@@ -63,17 +63,19 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.ResolucionSinAudiencia
             if (resolucion == null)
                 return ResultadoOperacion.Error("No se encontró la resolución indicada");
 
-            // ERROR ERR-RES-006: Manejo de errores erróneo
-            // No se valida que la resolución esté en estado "Asignada"
-            // antes de cancelarla, permite cancelar resoluciones en cualquier estado
+            // CORRECCIÓN ERR-RES-006: Manejo de errores corregido
+            // Se valida que la resolución esté en estado "Asignada" antes de cancelarla
+            if (resolucion.Estado != "Asignada")
+                return ResultadoOperacion.Error(
+                    "ERR-RES-006: Solo se pueden cancelar resoluciones en estado Asignada");
+
             if (!confirmado)
                 return ResultadoOperacion.Error(
                     "Se requiere confirmación para cancelar la resolución");
 
             resolucion.Estado = "Cancelada";
 
-            return ResultadoOperacion.Exitoso(
-                $"Resolución cancelada correctamente");
+            return ResultadoOperacion.Exitoso("Resolución cancelada correctamente");
         }
 
         public ResultadoOperacion FinalizarResolucion(int resolucionId)
