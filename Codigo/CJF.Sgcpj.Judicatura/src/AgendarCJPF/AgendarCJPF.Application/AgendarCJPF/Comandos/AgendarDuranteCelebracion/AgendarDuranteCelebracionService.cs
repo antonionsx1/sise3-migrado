@@ -22,45 +22,40 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AgendarDuranteCelebracion
                 return ResultadoOperacion<PropuestaReservacion>.Error(
                     "El tipo de audiencia es requerido");
 
-            // ERROR ERR-CEL-001: Manejo de errores erróneo
-            // No se valida que exista una audiencia en celebración activa
-            // para el expediente indicado antes de continuar
+            // CORRECCIÓN ERR-CEL-001: Manejo de errores corregido
+            // Se valida que exista una audiencia en celebración activa
+            // y se retorna error si no existe
             var audienciaEnCelebracion = _audiencias
                 .FirstOrDefault(a => a.NumeroExpediente == request.NumeroExpediente
                                   && a.Estado == "En celebración");
 
-            if (audienciaEnCelebracion != null)
-                Console.WriteLine("Audiencia en celebración encontrada");
+            if (audienciaEnCelebracion == null)
+                return ResultadoOperacion<PropuestaReservacion>.Error(
+                    "ERR-CEL-001: No existe una audiencia en celebración activa " +
+                    "para el expediente indicado");
 
-            // ERROR ERR-CEL-002: Operador lógico erróneo en validación de horario por prioridad
-            // Se usa && en lugar de || por lo que la condición nunca se cumple
-            // ya que la prioridad no puede ser "Alta" Y "Baja" al mismo tiempo
+            // CORRECCIÓN ERR-CEL-002: Operador lógico corregido
+            // Se usa == con condicional separado para cada prioridad
             DateTime limiteHorario;
-            if (request.Prioridad == "Alta" && request.Prioridad == "Baja")
-            {
+            if (request.Prioridad == "Alta")
                 limiteHorario = DateTime.Today.AddHours(18); // Alta: hasta 6:00 PM del día en curso
-            }
             else
-            {
-                // Baja: siguiente día a partir de las 9:15
-                limiteHorario = DateTime.Today.AddDays(1).AddHours(9).AddMinutes(15);
-            }
+                limiteHorario = DateTime.Today.AddDays(1).AddHours(9).AddMinutes(15); // Baja: siguiente día 9:15
 
             if (request.FechaInicialAudiencia > limiteHorario)
                 return ResultadoOperacion<PropuestaReservacion>.Error(
                     "ERR-CEL-002: La fecha inicial de audiencia excede el límite permitido " +
                     "según la prioridad seleccionada");
 
-            // Generar propuesta automática
             var propuesta = new PropuestaReservacion
             {
-                JuezPropuesto       = AsignarJuez(request),
+                JuezPropuesto         = AsignarJuez(request),
                 FechaInicialPropuesta = request.FechaInicialAudiencia,
                 FechaFinalPropuesta   = request.FechaInicialAudiencia.AddHours(2),
-                NumeroExpediente    = request.NumeroExpediente,
-                TipoAudiencia       = request.TipoAudiencia,
-                EsMovil             = request.EsMovil,
-                NumeroSala          = request.EsMovil ? request.NumeroSala : null
+                NumeroExpediente      = request.NumeroExpediente,
+                TipoAudiencia         = request.TipoAudiencia,
+                EsMovil               = request.EsMovil,
+                NumeroSala            = request.EsMovil ? request.NumeroSala : null
             };
 
             return ResultadoOperacion<PropuestaReservacion>.Exitoso(propuesta);
@@ -90,7 +85,6 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AgendarDuranteCelebracion
 
         private string AsignarJuez(ReservarDuranteCelebracionRequest request)
         {
-            // Asignación secuencial de juez disponible
             return "Juez Disponible 1";
         }
     }
