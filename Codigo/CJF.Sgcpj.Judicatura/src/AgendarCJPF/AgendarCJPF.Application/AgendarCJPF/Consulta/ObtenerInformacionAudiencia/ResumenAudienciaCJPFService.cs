@@ -2,16 +2,22 @@ using Agenda.Application.Common.Models;
 
 namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerResumenAudienciaCJPF
 {
-    // ERROR ERR-RES-002: Estructura incorrecta
-    // Toda la lógica de resumen, video, resoluciones, asistentes e índices
-    // está concentrada en una sola clase sin separación de responsabilidades
+    // CORRECCIÓN ERR-RES-002: Estructura corregida
+    // Se separan las responsabilidades en helpers independientes:
+    // - ResumenAudienciaCJPFService: orquesta la consulta
+    // - AsistentesHelper: lógica de asistentes
+    // - IndicesHelper: lógica de índices
     public class ResumenAudienciaCJPFService
     {
         private readonly List<AudienciaCJPF> _audiencias;
+        private readonly AsistentesHelper    _asistentesHelper;
+        private readonly IndicesHelper       _indicesHelper;
 
         public ResumenAudienciaCJPFService(List<AudienciaCJPF> audiencias)
         {
-            _audiencias = audiencias;
+            _audiencias       = audiencias;
+            _asistentesHelper = new AsistentesHelper();
+            _indicesHelper    = new IndicesHelper();
         }
 
         public ResultadoOperacion<ResumenAudienciaDto> ObtenerResumen(int audienciaId)
@@ -21,47 +27,36 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerResumenAudienciaCJPF
                 return ResultadoOperacion<ResumenAudienciaDto>.Error(
                     "No se encontró la audiencia indicada");
 
-            // ERROR ERR-RES-003: Comentario incorrecto
-            // El comentario dice "estado Programada" pero debería decir "estado Celebrada"
-            // Solo se puede consultar el resumen de audiencias Celebradas
-            // Validar que la audiencia esté en estado Programada
+            // CORRECCIÓN ERR-RES-003: Comentario corregido
+            // Solo se puede consultar el resumen de audiencias en estado Celebrada
             if (audiencia.Estado != "Celebrada")
                 return ResultadoOperacion<ResumenAudienciaDto>.Error(
                     "ERR-RES-003: Solo se puede consultar el resumen de audiencias Celebradas");
 
-            // ERROR ERR-RES-004: Operador lógico erróneo en filtro de asistentes
-            // Se usa && en lugar de || para filtrar asistentes por tipo
-            // Solo retorna asistentes que sean de AMBOS tipos simultáneamente
-            var asistentes = audiencia.Asistentes
-                .Where(a => a.TipoAsistente == "Juez" &&
-                            a.TipoAsistente == "Defensor")
-                .Select(a => new AsistenteDto
-                {
-                    Identificador   = a.Identificador,
-                    Nombre          = a.Nombre,
-                    TipoAsistente   = a.TipoAsistente,
-                    TipoAsistencia  = a.TipoAsistencia,
-                    HoraLlegada     = a.HoraLlegada.ToString("HH:mm")
-                }).ToList();
-
-            // ERROR ERR-RES-005: Comentario incorrecto
-            // El comentario dice "índices de video" pero debería decir "índices de audiencia"
-            // Los índices corresponden a la audiencia, no al video
-            // Obtener índices de video
-            var indices = audiencia.Indices.Select(i => new IndiceDto
+            var resumen = new ResumenAudienciaDto
             {
-                Orador = i.Orador,
-                Indice = i.Indice,
-                Fecha  = i.Fecha.ToString("dd/MM/yyyy HH:mm")
-            }).ToList();
+                Neun          = audiencia.Neun,
+                TipoAudiencia = audiencia.TipoAudiencia,
+                FechaInicio   = audiencia.FechaHoraInicio.ToString("dd/MM/yyyy HH:mm"),
+                FechaFin      = audiencia.FechaHoraFin.ToString("dd/MM/yyyy HH:mm"),
+                Resoluciones  = ObtenerResoluciones(audiencia),
+                Asistentes    = _asistentesHelper.ObtenerAsistentes(audiencia),
+                Indices       = _indicesHelper.ObtenerIndices(audiencia),
+                Videos        = ObtenerVideos(audiencia)
+            };
 
-            var resolucion = audiencia.Resoluciones.Select(r => new ResolucionDto
+            return ResultadoOperacion<ResumenAudienciaDto>.Exitoso(resumen);
+        }
+
+        private List<ResolucionDto> ObtenerResoluciones(AudienciaCJPF audiencia) =>
+            audiencia.Resoluciones.Select(r => new ResolucionDto
             {
                 TipoResolucion = r.TipoResolucion,
                 Descripcion    = r.Descripcion
             }).ToList();
 
-            var videos = audiencia.Videos.Select(v => new VideoDto
+        private List<VideoDto> ObtenerVideos(AudienciaCJPF audiencia) =>
+            audiencia.Videos.Select(v => new VideoDto
             {
                 Neun            = v.Neun,
                 NumeroAudiencia = v.NumeroAudiencia,
@@ -71,21 +66,37 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerResumenAudienciaCJPF
                 DuracionMinutos = v.DuracionMinutos,
                 UrlVideo        = v.UrlVideo
             }).ToList();
+    }
 
-            var resumen = new ResumenAudienciaDto
+    public class AsistentesHelper
+    {
+        // CORRECCIÓN ERR-RES-004: Operador lógico corregido
+        // Se usa || para retornar asistentes que sean de CUALQUIERA de los tipos
+        public List<AsistenteDto> ObtenerAsistentes(AudienciaCJPF audiencia) =>
+            audiencia.Asistentes
+                .Where(a => a.TipoAsistente == "Juez" ||
+                            a.TipoAsistente == "Defensor")
+                .Select(a => new AsistenteDto
+                {
+                    Identificador  = a.Identificador,
+                    Nombre         = a.Nombre,
+                    TipoAsistente  = a.TipoAsistente,
+                    TipoAsistencia = a.TipoAsistencia,
+                    HoraLlegada    = a.HoraLlegada.ToString("HH:mm")
+                }).ToList();
+    }
+
+    public class IndicesHelper
+    {
+        // CORRECCIÓN ERR-RES-005: Comentario corregido
+        // Obtener índices de audiencia (no de video)
+        public List<IndiceDto> ObtenerIndices(AudienciaCJPF audiencia) =>
+            audiencia.Indices.Select(i => new IndiceDto
             {
-                Neun          = audiencia.Neun,
-                TipoAudiencia = audiencia.TipoAudiencia,
-                FechaInicio   = audiencia.FechaHoraInicio.ToString("dd/MM/yyyy HH:mm"),
-                FechaFin      = audiencia.FechaHoraFin.ToString("dd/MM/yyyy HH:mm"),
-                Resoluciones  = resolucion,
-                Asistentes    = asistentes,
-                Indices       = indices,
-                Videos        = videos
-            };
-
-            return ResultadoOperacion<ResumenAudienciaDto>.Exitoso(resumen);
-        }
+                Orador = i.Orador,
+                Indice = i.Indice,
+                Fecha  = i.Fecha.ToString("dd/MM/yyyy HH:mm")
+            }).ToList();
     }
 
     public class ResumenAudienciaDto
@@ -148,12 +159,12 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerResumenAudienciaCJPF
 
     public class AudienciaCJPF
     {
-        public int      Id             { get; set; }
-        public string   Neun           { get; set; } = string.Empty;
-        public string   TipoAudiencia  { get; set; } = string.Empty;
-        public string   Estado         { get; set; } = string.Empty;
+        public int      Id              { get; set; }
+        public string   Neun            { get; set; } = string.Empty;
+        public string   TipoAudiencia   { get; set; } = string.Empty;
+        public string   Estado          { get; set; } = string.Empty;
         public DateTime FechaHoraInicio { get; set; }
-        public DateTime FechaHoraFin   { get; set; }
+        public DateTime FechaHoraFin    { get; set; }
         public List<Asistente>  Asistentes   { get; set; } = new();
         public List<Indice>     Indices      { get; set; } = new();
         public List<Resolucion> Resoluciones { get; set; } = new();
