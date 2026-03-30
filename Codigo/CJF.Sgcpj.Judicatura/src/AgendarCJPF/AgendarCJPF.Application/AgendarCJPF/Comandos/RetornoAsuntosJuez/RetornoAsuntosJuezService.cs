@@ -17,9 +17,12 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.RetornoAsuntosJuez
 
         public ResultadoOperacion ReturnarAsuntos(ReturnarAsuntosRequest request)
         {
-            // ERROR ERR-RET-001: Manejo de errores erróneo
-            // No se valida que el usuario sea Administrador antes de ejecutar el returno
-            // Permite que cualquier usuario realice esta operación
+            // CORRECCIÓN ERR-RET-001: Manejo de errores corregido
+            // Se valida que el usuario sea Administrador antes de ejecutar el returno
+            if (request.RolUsuario != "Administrador")
+                return ResultadoOperacion.Error(
+                    "ERR-RET-001: Solo el Administrador puede realizar el returno de asuntos");
+
             if (string.IsNullOrEmpty(request.JuezOrigenId))
                 return ResultadoOperacion.Error("Debe seleccionar el juez de origen");
 
@@ -30,9 +33,12 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.RetornoAsuntosJuez
                 return ResultadoOperacion.Error(
                     "El juez de origen y destino no pueden ser el mismo");
 
-            // ERROR ERR-RET-002: Manejo de errores erróneo
-            // No se valida que exista confirmación del usuario antes de ejecutar el returno
-            // Permite transferir audiencias sin confirmación
+            // CORRECCIÓN ERR-RET-002: Manejo de errores corregido
+            // Se valida que el usuario haya confirmado el returno antes de ejecutarlo
+            if (!request.Confirmado)
+                return ResultadoOperacion.Error(
+                    "ERR-RET-002: Se requiere confirmación para realizar el returno de asuntos");
+
             if (string.IsNullOrEmpty(request.CausaPrecisa))
                 return ResultadoOperacion.Error("Debe indicar la causa precisa del returno");
 
@@ -43,10 +49,8 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.RetornoAsuntosJuez
                 j.Id == request.JuezDestinoId && j.EstaActivo);
 
             if (juezDestino == null)
-                return ResultadoOperacion.Error(
-                    "El juez destino no se encuentra activo");
+                return ResultadoOperacion.Error("El juez destino no se encuentra activo");
 
-            // Transferir audiencias del juez origen al juez destino
             var audienciasATransferir = _audiencias
                 .Where(a => a.JuezAsignado == request.JuezOrigenId &&
                             a.Estado != "Celebrada" &&
@@ -78,24 +82,24 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.RetornoAsuntosJuez
 
     public class ReturnarAsuntosRequest
     {
-        public string JuezOrigenId      { get; set; } = string.Empty;
-        public string JuezDestinoId     { get; set; } = string.Empty;
-        public bool   Confirmado        { get; set; }
-        public string CausaPrecisa      { get; set; } = string.Empty;
-        public string FirmaElectronica  { get; set; } = string.Empty;
+        public string JuezOrigenId         { get; set; } = string.Empty;
+        public string JuezDestinoId        { get; set; } = string.Empty;
+        public bool   Confirmado           { get; set; }
+        public string CausaPrecisa         { get; set; } = string.Empty;
+        public string FirmaElectronica     { get; set; } = string.Empty;
         public string UsuarioAdministrador { get; set; } = string.Empty;
-        public string RolUsuario        { get; set; } = string.Empty;
+        public string RolUsuario           { get; set; } = string.Empty;
     }
 
     public class AudienciaCJPF
     {
-        public int      Id              { get; set; }
+        public int      Id               { get; set; }
         public string   NumeroExpediente { get; set; } = string.Empty;
-        public string   JuezAsignado    { get; set; } = string.Empty;
-        public string?  JuezAnterior    { get; set; }
-        public string   Estado          { get; set; } = string.Empty;
-        public string?  MotivoRetorno   { get; set; }
-        public DateTime? FechaRetorno   { get; set; }
+        public string   JuezAsignado     { get; set; } = string.Empty;
+        public string?  JuezAnterior     { get; set; }
+        public string   Estado           { get; set; } = string.Empty;
+        public string?  MotivoRetorno    { get; set; }
+        public DateTime? FechaRetorno    { get; set; }
     }
 
     public class JuezCJPF
