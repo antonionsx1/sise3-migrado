@@ -2,19 +2,20 @@ using Agenda.Application.Common.Models;
 
 namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerAudienciasPreviasCJPF
 {
-    // ERROR ERR-AUD-001 y ERR-AUD-002: Estructura incorrecta
-    // Toda la lógica de consulta, filtrado, menú contextual y acciones
-    // está concentrada en una sola clase.
-    // Debería separarse en:
-    // - AudienciasPreviasQueryService (consulta y filtrado)
-    // - MenuContextualService (lógica del menú por estado)
+    // CORRECCIÓN ERR-AUD-001: Estructura corregida
+    // Se separan las responsabilidades en clases independientes:
+    // - AudienciasPreviasCJPFService: consulta y filtrado
+    // - MenuContextualService: lógica del menú por estado
+
     public class AudienciasPreviasCJPFService
     {
-        private readonly List<AudienciaCJPF> _audiencias;
+        private readonly List<AudienciaCJPF>  _audiencias;
+        private readonly MenuContextualService _menuService;
 
         public AudienciasPreviasCJPFService(List<AudienciaCJPF> audiencias)
         {
-            _audiencias = audiencias;
+            _audiencias  = audiencias;
+            _menuService = new MenuContextualService();
         }
 
         public ResultadoAudienciasPrevias ObtenerAudiencias(
@@ -30,38 +31,23 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerAudienciasPreviasCJP
                 .OrderByDescending(a => a.FechaHoraInicio)
                 .Select(a => new AudienciaPreviaDto
                 {
-                    Id             = a.Id,
-                    TipoAudiencia  = a.TipoAudiencia,
-                    Imputado       = a.Imputado,
-                    Juez           = a.JuezAsignado,
-                    Forma          = a.FormatoAudiencia,
-                    FechaHoraInicio = a.FechaHoraInicio.ToString("dd/MM/yyyy HH:mm"),
-                    FechaHoraFin   = a.FechaHoraFin.ToString("dd/MM/yyyy HH:mm"),
-                    Capturo        = $"{a.AgendadoPor} - {a.FechaCaptura:dd/MM/yyyy}",
-                    Estado         = a.Estado,
+                    Id                  = a.Id,
+                    TipoAudiencia       = a.TipoAudiencia,
+                    Imputado            = a.Imputado,
+                    Juez                = a.JuezAsignado,
+                    Forma               = a.FormatoAudiencia,
+                    FechaHoraInicio     = a.FechaHoraInicio.ToString("dd/MM/yyyy HH:mm"),
+                    FechaHoraFin        = a.FechaHoraFin.ToString("dd/MM/yyyy HH:mm"),
+                    Capturo             = $"{a.AgendadoPor} - {a.FechaCaptura:dd/MM/yyyy}",
+                    Estado              = a.Estado,
                     MostrarResoluciones = a.Estado == "Celebrada",
-                    // Lógica del menú contextual mezclada con la consulta (error estructura)
-                    OpcionesMenu   = ObtenerOpcionesMenu(a.Estado)
+                    OpcionesMenu        = _menuService.ObtenerOpciones(a.Estado)
                 }).ToList();
 
             return new ResultadoAudienciasPrevias
             {
                 NumeroExpediente = numeroExpediente,
                 Audiencias       = audiencias
-            };
-        }
-
-        // ERROR ERR-AUD-002: Método de menú contextual mezclado en el mismo servicio
-        // Debería estar en una clase separada MenuContextualService
-        private List<string> ObtenerOpcionesMenu(string estado)
-        {
-            return estado switch
-            {
-                "Programada" => new List<string> { "Movimientos", "Cambiar Juez", "Cancelar" },
-                "Diferida"   => new List<string> { "Movimientos", "Reservar" },
-                "Cancelada"  => new List<string> { "Ver Detalle" },
-                "Celebrada"  => new List<string> { "Movimientos", "Resumen", "Continuar" },
-                _            => new List<string>()
             };
         }
 
@@ -74,10 +60,26 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.ObtenerAudienciasPreviasCJP
         }
     }
 
+    // CORRECCIÓN ERR-AUD-002: Clase independiente para el menú contextual
+    public class MenuContextualService
+    {
+        public List<string> ObtenerOpciones(string estado)
+        {
+            return estado switch
+            {
+                "Programada" => new List<string> { "Movimientos", "Cambiar Juez", "Cancelar" },
+                "Diferida"   => new List<string> { "Movimientos", "Reservar" },
+                "Cancelada"  => new List<string> { "Ver Detalle" },
+                "Celebrada"  => new List<string> { "Movimientos", "Resumen", "Continuar" },
+                _            => new List<string>()
+            };
+        }
+    }
+
     public class ResultadoAudienciasPrevias
     {
-        public string                    NumeroExpediente { get; set; } = string.Empty;
-        public List<AudienciaPreviaDto>  Audiencias       { get; set; } = new();
+        public string                   NumeroExpediente { get; set; } = string.Empty;
+        public List<AudienciaPreviaDto> Audiencias       { get; set; } = new();
     }
 
     public class AudienciaPreviaDto
