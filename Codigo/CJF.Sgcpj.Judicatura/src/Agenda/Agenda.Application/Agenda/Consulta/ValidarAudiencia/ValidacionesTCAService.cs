@@ -68,17 +68,17 @@ namespace Agenda.Application.Agenda.Consulta.ValidacionesTCA
             if (!string.IsNullOrEmpty(request.NumeroExpediente))
             {
                 var partes = request.NumeroExpediente.Split('/');
-                // ERROR ERR-VTCA-001: Operador lógico erróneo
-                // Se usa || en lugar de && por lo que siempre pasa la validación
-                // ya que siempre se cumple al menos una de las condiciones
                 if (partes.Length != 2 || !int.TryParse(partes[0], out _) ||
                     partes[1].Length != 4)
-                {
-                    // La condición anterior es correcta pero la de abajo usa ||
-                    // incorrecto para validar el horario
-                }
+                    errores["NumeroExpediente"] =
+                        "El formato del expediente debe ser número/AAAA";
+            }
 
-                bool horarioValido = request.FechaHora.Hour >= 9 ||
+            // CORRECCIÓN ERR-VTCA-001: Operador lógico corregido
+            // Se usa && para validar correctamente el rango 09:00 - 14:00
+            if (request.FechaHora != default)
+            {
+                bool horarioValido = request.FechaHora.Hour >= 9 &&
                                      request.FechaHora.Hour < 14;
 
                 if (!horarioValido)
@@ -152,8 +152,8 @@ namespace Agenda.Application.Agenda.Consulta.ValidacionesTCA
 
     public class ResultadoValidacionTCA
     {
-        public bool                        Exito          { get; private set; }
-        public Dictionary<string, string>  ErroresPorCampo { get; private set; } = new();
+        public bool                       Exito           { get; private set; }
+        public Dictionary<string, string> ErroresPorCampo { get; private set; } = new();
 
         public static ResultadoValidacionTCA Exitoso() =>
             new ResultadoValidacionTCA { Exito = true };
@@ -175,15 +175,15 @@ namespace Agenda.Application.Agenda.Consulta.ValidacionesTCA
 
     public class CatalogoTCA
     {
-        public string Tipo      { get; set; } = string.Empty;
-        public string Valor     { get; set; } = string.Empty;
+        public string Tipo       { get; set; } = string.Empty;
+        public string Valor      { get; set; } = string.Empty;
         public bool   EstaActivo { get; set; }
     }
 
     public class ReglaValidacionTCA
     {
-        public string Campo      { get; set; } = string.Empty;
-        public string Regla      { get; set; } = string.Empty;
-        public string Mensaje    { get; set; } = string.Empty;
+        public string Campo   { get; set; } = string.Empty;
+        public string Regla   { get; set; } = string.Empty;
+        public string Mensaje { get; set; } = string.Empty;
     }
 }
