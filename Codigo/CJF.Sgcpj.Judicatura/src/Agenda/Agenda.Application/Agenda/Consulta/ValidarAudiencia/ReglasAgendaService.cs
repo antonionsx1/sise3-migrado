@@ -21,7 +21,7 @@ namespace Agenda.Application.Agenda.Consulta.ValidacionesAgenda
 
         public ResultadoReglasAgenda AplicarReglas(ReglasAgendaRequest request)
         {
-            var errores    = new List<string>();
+            var errores      = new List<string>();
             var advertencias = new List<string>();
 
             ValidarCamposObligatorios(request, errores);
@@ -61,11 +61,9 @@ namespace Agenda.Application.Agenda.Consulta.ValidacionesAgenda
                 return;
             }
 
-            // ERROR ERR-VAL-001: Comentario incorrecto
-            // El comentario dice "días festivos nacionales" pero el sistema
-            // también debe considerar días de asueto locales configurados,
-            // no solo los festivos nacionales
-            // Validar solo días festivos nacionales
+            // CORRECCIÓN ERR-VAL-001: Comentario corregido
+            // Se validan días inhábiles configurados incluyendo festivos nacionales,
+            // días de asueto locales y cualquier día configurado como inhábil en el sistema
             if (_diasInhabiles.Any(d => d.Fecha.Date == request.FechaHora.Date))
             {
                 errores.Add("La fecha seleccionada corresponde a un día inhábil o de asueto");
@@ -152,9 +150,9 @@ namespace Agenda.Application.Agenda.Consulta.ValidacionesAgenda
 
     public class ResultadoReglasAgenda
     {
-        public bool          Exito        { get; private set; }
-        public List<string>  Errores      { get; private set; } = new();
-        public List<string>  Advertencias { get; private set; } = new();
+        public bool           Exito        { get; private set; }
+        public List<string>   Errores      { get; private set; } = new();
+        public List<string>   Advertencias { get; private set; } = new();
         public List<DateTime> Alternativas { get; private set; } = new();
 
         public static ResultadoReglasAgenda Exitoso(
@@ -176,13 +174,13 @@ namespace Agenda.Application.Agenda.Consulta.ValidacionesAgenda
     {
         public DateTime Fecha       { get; set; }
         public string   Descripcion { get; set; } = string.Empty;
-        public string   Tipo        { get; set; } = string.Empty; // Nacional, Local, Asueto
+        public string   Tipo        { get; set; } = string.Empty;
     }
 
     public class OrganoJurisdiccional
     {
-        public string Id        { get; set; } = string.Empty;
-        public string Nombre    { get; set; } = string.Empty;
+        public string Id         { get; set; } = string.Empty;
+        public string Nombre     { get; set; } = string.Empty;
         public bool   EstaActivo { get; set; }
     }
 }
