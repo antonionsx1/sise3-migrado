@@ -4,18 +4,18 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.ReasignarAudiencia
 {
     public class ReasignarAudienciaService
     {
-        private readonly List<AudienciaCJPF>         _audiencias;
-        private readonly List<ResponsableCJPF>       _responsables;
-        private readonly List<HistorialAsignacion>   _historial;
+        private readonly List<AudienciaCJPF>       _audiencias;
+        private readonly List<ResponsableCJPF>     _responsables;
+        private readonly List<HistorialAsignacion> _historial;
 
         public ReasignarAudienciaService(
             List<AudienciaCJPF>       audiencias,
             List<ResponsableCJPF>     responsables,
             List<HistorialAsignacion> historial)
         {
-            _audiencias    = audiencias;
-            _responsables  = responsables;
-            _historial     = historial;
+            _audiencias   = audiencias;
+            _responsables = responsables;
+            _historial    = historial;
         }
 
         public ResultadoOperacion Reasignar(ReasignarAudienciaRequest request)
@@ -24,9 +24,19 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.ReasignarAudiencia
             if (audiencia == null)
                 return ResultadoOperacion.Error("No se encontró la audiencia indicada");
 
-            // ERROR ERR-REAS-001: Manejo de errores erróneo
-            // No se valida que el nuevo responsable exista y esté activo
-            // antes de hacer la reasignación
+            // CORRECCIÓN ERR-REAS-001: Manejo de errores corregido
+            // Se valida que el nuevo responsable exista y esté activo antes de reasignar
+            var nuevoResponsable = _responsables.FirstOrDefault(r =>
+                r.Id == request.NuevoResponsableId);
+
+            if (nuevoResponsable == null)
+                return ResultadoOperacion.Error(
+                    "ERR-REAS-001: El nuevo responsable no existe en el catálogo");
+
+            if (!nuevoResponsable.EstaActivo)
+                return ResultadoOperacion.Error(
+                    "ERR-REAS-001: El nuevo responsable no se encuentra activo");
+
             bool disponible = !_audiencias.Any(a =>
                 a.ResponsableId == request.NuevoResponsableId &&
                 a.Estado != "Cancelada" &&
@@ -37,16 +47,15 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.ReasignarAudiencia
                 return ResultadoOperacion.Error(
                     "El nuevo responsable no tiene disponibilidad en ese horario");
 
-            // Guardar historial
             _historial.Add(new HistorialAsignacion
             {
-                Id              = _historial.Count + 1,
-                AudienciaId     = audiencia.Id,
+                Id                  = _historial.Count + 1,
+                AudienciaId         = audiencia.Id,
                 ResponsableAnterior = audiencia.ResponsableId,
                 ResponsableNuevo    = request.NuevoResponsableId,
-                Motivo          = request.Motivo,
-                FechaCambio     = DateTime.Now,
-                UsuarioReasigno = request.UsuarioId
+                Motivo              = request.Motivo,
+                FechaCambio         = DateTime.Now,
+                UsuarioReasigno     = request.UsuarioId
             });
 
             audiencia.ResponsableId = request.NuevoResponsableId;
@@ -54,7 +63,7 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.ReasignarAudiencia
             NotificarInvolucrados(audiencia, request);
 
             return ResultadoOperacion.Exitoso(
-                $"Audiencia reasignada correctamente al responsable {request.NuevoResponsableId}");
+                $"Audiencia reasignada correctamente a {nuevoResponsable.Nombre}");
         }
 
         private void NotificarInvolucrados(
@@ -66,20 +75,20 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.ReasignarAudiencia
 
     public class ReasignarAudienciaRequest
     {
-        public int    AudienciaId         { get; set; }
-        public string NuevoResponsableId  { get; set; } = string.Empty;
-        public string Motivo              { get; set; } = string.Empty;
-        public string UsuarioId           { get; set; } = string.Empty;
+        public int    AudienciaId        { get; set; }
+        public string NuevoResponsableId { get; set; } = string.Empty;
+        public string Motivo             { get; set; } = string.Empty;
+        public string UsuarioId          { get; set; } = string.Empty;
     }
 
     public class AudienciaCJPF
     {
-        public int      Id              { get; set; }
+        public int      Id               { get; set; }
         public string   NumeroExpediente { get; set; } = string.Empty;
         public string   ResponsableId   { get; set; } = string.Empty;
-        public string   Estado          { get; set; } = string.Empty;
-        public DateTime FechaHoraInicio { get; set; }
-        public DateTime FechaHoraFin    { get; set; }
+        public string   Estado           { get; set; } = string.Empty;
+        public DateTime FechaHoraInicio  { get; set; }
+        public DateTime FechaHoraFin     { get; set; }
     }
 
     public class ResponsableCJPF
