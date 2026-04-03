@@ -14,10 +14,13 @@ namespace Agenda.Application.Agenda.Consulta.FiltrosAvanzadosTCA
 
         public ResultadoFiltro AplicarFiltros(FiltroAvanzadoTCARequest filtro)
         {
-            // ERROR ERR-FIL-001: Manejo de errores erróneo
-            // No se valida que el rango de fechas sea correcto antes de filtrar
-            // Si FechaFin < FechaInicio la consulta devuelve resultados vacíos
-            // sin informar al usuario que el rango es inválido
+            // CORRECCIÓN ERR-FIL-001: Manejo de errores corregido
+            // Se valida que el rango de fechas sea correcto antes de filtrar
+            if (filtro.FechaInicio.HasValue && filtro.FechaFin.HasValue &&
+                filtro.FechaFin.Value.Date < filtro.FechaInicio.Value.Date)
+                return ResultadoFiltro.Error(
+                    "ERR-FIL-001: La fecha fin no puede ser anterior a la fecha inicio");
+
             var query = _audiencias.AsEnumerable();
 
             if (filtro.FechaInicio.HasValue)
@@ -27,7 +30,14 @@ namespace Agenda.Application.Agenda.Consulta.FiltrosAvanzadosTCA
                 query = query.Where(a => a.FechaHora.Date <= filtro.FechaFin.Value.Date);
 
             if (!string.IsNullOrEmpty(filtro.Estado))
+            {
+                var estadosValidos = new[] { "Programada", "Cancelada", "Diferida", "Celebrada" };
+                if (!estadosValidos.Contains(filtro.Estado))
+                    return ResultadoFiltro.Error(
+                        $"ERR-FIL-001: El estado '{filtro.Estado}' no es válido");
+
                 query = query.Where(a => a.Estado == filtro.Estado);
+            }
 
             if (!string.IsNullOrEmpty(filtro.TipoAudiencia))
                 query = query.Where(a => a.TipoAudiencia == filtro.TipoAudiencia);
