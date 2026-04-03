@@ -24,10 +24,8 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.FirmaResolucionCJPF
             if (resolucion == null)
                 return ResultadoOperacion.Error("No se encontró la resolución indicada");
 
-            // ERROR ERR-FIR-001: Comentario incorrecto
-            // El comentario dice "validar que el usuario NO esté autorizado"
-            // cuando debe validar que el usuario SÍ esté autorizado para firmar
-            // Validar que el usuario NO esté autorizado para firmar
+            // CORRECCIÓN ERR-FIR-001: Comentario corregido
+            // Valida que el usuario SÍ cuente con perfil autorizado para firmar resoluciones
             bool perfilAutorizado = _perfiles.Any(p =>
                 p.UsuarioId == request.UsuarioId && p.PuedeFiremar);
 
@@ -39,18 +37,18 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.FirmaResolucionCJPF
             if (!validacion.Exito)
                 return validacion;
 
-            resolucion.Estado = "Firmada";
-            resolucion.FechaFirma = DateTime.Now;
+            resolucion.Estado      = "Firmada";
+            resolucion.FechaFirma  = DateTime.Now;
             resolucion.UsuarioFirmo = request.UsuarioId;
 
             _huellas.Add(new HuellaFirma
             {
-                Id            = _huellas.Count + 1,
-                ResolucionId  = resolucion.Id,
-                UsuarioId     = request.UsuarioId,
-                FechaFirma    = DateTime.Now,
-                Confirmada    = true,
-                FirmaDigital  = request.FirmaDigital
+                Id           = _huellas.Count + 1,
+                ResolucionId = resolucion.Id,
+                UsuarioId    = request.UsuarioId,
+                FechaFirma   = DateTime.Now,
+                Confirmada   = true,
+                FirmaDigital = request.FirmaDigital
             });
 
             return ResultadoOperacion.Exitoso(
@@ -63,8 +61,8 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.FirmaResolucionCJPF
             if (resolucion == null)
                 return ResultadoOperacion.Error("No se encontró la resolución indicada");
 
-            resolucion.Estado = "Borrador";
-            resolucion.FechaFirma = null;
+            resolucion.Estado       = "Borrador";
+            resolucion.FechaFirma   = null;
             resolucion.UsuarioFirmo = null;
 
             return ResultadoOperacion.Exitoso("Firma cancelada. La resolución queda en borrador");
@@ -84,9 +82,9 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.FirmaResolucionCJPF
 
     public class FirmarResolucionRequest
     {
-        public int    ResolucionId  { get; set; }
-        public string UsuarioId     { get; set; } = string.Empty;
-        public string FirmaDigital  { get; set; } = string.Empty;
+        public int    ResolucionId { get; set; }
+        public string UsuarioId    { get; set; } = string.Empty;
+        public string FirmaDigital { get; set; } = string.Empty;
     }
 
     public class ResolucionCJPF
