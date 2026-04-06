@@ -4,9 +4,9 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionAudienciaExtend
 {
     public class AutorizacionAudienciaExtendidaService
     {
-        private readonly List<SolicitudExtension>  _solicitudes;
-        private readonly List<PerfilAutorizador>   _autorizadores;
-        private readonly List<AudienciaCJPF>       _audiencias;
+        private readonly List<SolicitudExtension> _solicitudes;
+        private readonly List<PerfilAutorizador>  _autorizadores;
+        private readonly List<AudienciaCJPF>      _audiencias;
 
         public AutorizacionAudienciaExtendidaService(
             List<SolicitudExtension> solicitudes,
@@ -28,18 +28,25 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionAudienciaExtend
                 return ResultadoOperacion.Error(
                     "Solo se puede solicitar extensión de audiencias en celebración");
 
-            // ERROR ERR-AUT-001: Manejo de errores erróneo
-            // No se valida si ya existe una solicitud pendiente para esta audiencia
-            // Permite crear múltiples solicitudes duplicadas
+            // CORRECCIÓN ERR-AUT-001: Manejo de errores corregido
+            // Se valida que no exista una solicitud pendiente para esta audiencia
+            bool solicitudPendiente = _solicitudes.Any(s =>
+                s.AudienciaId == request.AudienciaId &&
+                s.Estado == "Pendiente");
+
+            if (solicitudPendiente)
+                return ResultadoOperacion.Error(
+                    "ERR-AUT-001: Ya existe una solicitud de extensión pendiente para esta audiencia");
+
             var solicitud = new SolicitudExtension
             {
-                Id            = _solicitudes.Count + 1,
-                AudienciaId   = request.AudienciaId,
+                Id              = _solicitudes.Count + 1,
+                AudienciaId     = request.AudienciaId,
                 MotivoExtension = request.MotivoExtension,
-                FechaFinReal  = request.FechaFinReal,
-                SolicitanteId = request.UsuarioId,
-                FechaSolicitud = DateTime.Now,
-                Estado        = "Pendiente",
+                FechaFinReal    = request.FechaFinReal,
+                SolicitanteId   = request.UsuarioId,
+                FechaSolicitud  = DateTime.Now,
+                Estado          = "Pendiente",
                 FechaExpiracion = DateTime.Now.AddHours(request.HorasExpiracion)
             };
 
@@ -55,9 +62,15 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionAudienciaExtend
             if (solicitud == null)
                 return ResultadoOperacion.Error("No se encontró la solicitud indicada");
 
-            // ERROR ERR-AUT-002: Manejo de errores erróneo
-            // No se valida que el autorizador tenga perfil autorizado
-            // Permite que cualquier usuario autorice extensiones
+            // CORRECCIÓN ERR-AUT-002: Manejo de errores corregido
+            // Se valida que el autorizador tenga perfil autorizado antes de proceder
+            var perfilAutorizador = _autorizadores.FirstOrDefault(a =>
+                a.UsuarioId == request.AutorizadorId && a.PuedeAutorizar);
+
+            if (perfilAutorizador == null)
+                return ResultadoOperacion.Error(
+                    "ERR-AUT-002: El usuario no cuenta con perfil autorizado para aprobar extensiones");
+
             if (solicitud.Estado != "Pendiente")
                 return ResultadoOperacion.Error(
                     "Solo se pueden autorizar solicitudes en estado Pendiente");
@@ -73,16 +86,16 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionAudienciaExtend
             if (audiencia == null)
                 return ResultadoOperacion.Error("No se encontró la audiencia asociada");
 
-            solicitud.Estado        = "Autorizada";
-            solicitud.AutorizadorId = request.AutorizadorId;
-            solicitud.FechaAutorizacion = DateTime.Now;
+            solicitud.Estado             = "Autorizada";
+            solicitud.AutorizadorId      = request.AutorizadorId;
+            solicitud.FechaAutorizacion  = DateTime.Now;
             solicitud.MotivoAutorizacion = request.MotivoAutorizacion;
 
             audiencia.FechaFinReal    = solicitud.FechaFinReal;
             audiencia.MotivoExtension = solicitud.MotivoExtension;
 
             return ResultadoOperacion.Exitoso(
-                $"Extensión de audiencia autorizada correctamente");
+                "Extensión de audiencia autorizada correctamente");
         }
 
         public ResultadoOperacion Rechazar(RechazarExtensionRequest request)
@@ -95,9 +108,9 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionAudienciaExtend
                 return ResultadoOperacion.Error(
                     "Solo se pueden rechazar solicitudes en estado Pendiente");
 
-            solicitud.Estado          = "Rechazada";
-            solicitud.AutorizadorId   = request.AutorizadorId;
-            solicitud.MotivoRechazo   = request.MotivoRechazo;
+            solicitud.Estado            = "Rechazada";
+            solicitud.AutorizadorId     = request.AutorizadorId;
+            solicitud.MotivoRechazo     = request.MotivoRechazo;
             solicitud.FechaAutorizacion = DateTime.Now;
 
             return ResultadoOperacion.Exitoso(
@@ -123,30 +136,30 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionAudienciaExtend
 
     public class RechazarExtensionRequest
     {
-        public int    SolicitudId  { get; set; }
+        public int    SolicitudId   { get; set; }
         public string AutorizadorId { get; set; } = string.Empty;
         public string MotivoRechazo { get; set; } = string.Empty;
     }
 
     public class SolicitudExtension
     {
-        public int      Id                  { get; set; }
-        public int      AudienciaId         { get; set; }
-        public string   MotivoExtension     { get; set; } = string.Empty;
-        public DateTime FechaFinReal        { get; set; }
-        public string   SolicitanteId       { get; set; } = string.Empty;
-        public DateTime FechaSolicitud      { get; set; }
-        public DateTime FechaExpiracion     { get; set; }
-        public string   Estado              { get; set; } = string.Empty;
-        public string?  AutorizadorId       { get; set; }
-        public DateTime? FechaAutorizacion  { get; set; }
-        public string?  MotivoAutorizacion  { get; set; }
-        public string?  MotivoRechazo       { get; set; }
+        public int      Id                 { get; set; }
+        public int      AudienciaId        { get; set; }
+        public string   MotivoExtension    { get; set; } = string.Empty;
+        public DateTime FechaFinReal       { get; set; }
+        public string   SolicitanteId      { get; set; } = string.Empty;
+        public DateTime FechaSolicitud     { get; set; }
+        public DateTime FechaExpiracion    { get; set; }
+        public string   Estado             { get; set; } = string.Empty;
+        public string?  AutorizadorId      { get; set; }
+        public DateTime? FechaAutorizacion { get; set; }
+        public string?  MotivoAutorizacion { get; set; }
+        public string?  MotivoRechazo      { get; set; }
     }
 
     public class PerfilAutorizador
     {
-        public string UsuarioId    { get; set; } = string.Empty;
+        public string UsuarioId      { get; set; } = string.Empty;
         public bool   PuedeAutorizar { get; set; }
     }
 
