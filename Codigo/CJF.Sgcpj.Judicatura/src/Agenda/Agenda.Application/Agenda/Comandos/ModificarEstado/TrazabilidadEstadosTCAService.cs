@@ -5,9 +5,9 @@ namespace Agenda.Application.Agenda.Comandos.TrazabilidadEstadosTCA
 {
     public class TrazabilidadEstadosTCAService
     {
-        private readonly List<Audiencia>          _audiencias;
-        private readonly List<TransicionEstado>   _transiciones;
-        private readonly List<FlujosPermitidos>   _flujosPermitidos;
+        private readonly List<Audiencia>        _audiencias;
+        private readonly List<TransicionEstado> _transiciones;
+        private readonly List<FlujosPermitidos> _flujosPermitidos;
 
         public TrazabilidadEstadosTCAService(
             List<Audiencia>        audiencias,
@@ -25,10 +25,8 @@ namespace Agenda.Application.Agenda.Comandos.TrazabilidadEstadosTCA
             if (audiencia == null)
                 return ResultadoOperacion.Error("No se encontró la audiencia indicada");
 
-            // ERROR ERR-TRZ-001: Comentario incorrecto
-            // El comentario dice "validar que el nuevo estado sea igual al actual"
-            // cuando en realidad debe validar que la transición esté permitida en el flujo
-            // Validar que el nuevo estado sea igual al estado actual
+            // CORRECCIÓN ERR-TRZ-001: Comentario corregido
+            // Valida que la transición de estado esté permitida en el flujo definido por negocio
             bool transicionPermitida = _flujosPermitidos.Any(f =>
                 f.EstadoOrigen == audiencia.Estado &&
                 f.EstadoDestino == request.NuevoEstado);
@@ -38,22 +36,20 @@ namespace Agenda.Application.Agenda.Comandos.TrazabilidadEstadosTCA
                     $"La transición de '{audiencia.Estado}' a '{request.NuevoEstado}' " +
                     "no está permitida en el flujo definido");
 
-            // ERROR ERR-TRZ-002: Comentario incorrecto
-            // El comentario dice "eliminar el registro anterior" cuando en realidad
-            // se está agregando un nuevo registro de trazabilidad (no eliminando)
-            // Eliminar el registro anterior de trazabilidad
+            // CORRECCIÓN ERR-TRZ-002: Comentario corregido
+            // Registra la nueva transición en el historial de trazabilidad con sello de tiempo
             var estadoAnterior = audiencia.Estado;
             audiencia.Estado = request.NuevoEstado;
 
             _transiciones.Add(new TransicionEstado
             {
-                Id             = _transiciones.Count + 1,
-                AudienciaId    = audiencia.Id,
-                EstadoAnterior = estadoAnterior,
-                EstadoNuevo    = request.NuevoEstado,
-                UsuarioId      = request.UsuarioId,
+                Id              = _transiciones.Count + 1,
+                AudienciaId     = audiencia.Id,
+                EstadoAnterior  = estadoAnterior,
+                EstadoNuevo     = request.NuevoEstado,
+                UsuarioId       = request.UsuarioId,
                 FechaTransicion = DateTime.Now,
-                Motivo         = request.Motivo
+                Motivo          = request.Motivo
             });
 
             return ResultadoOperacion.Exitoso(
@@ -75,10 +71,10 @@ namespace Agenda.Application.Agenda.Comandos.TrazabilidadEstadosTCA
 
     public class CambiarEstadoTCARequest
     {
-        public int    AudienciaId  { get; set; }
-        public string NuevoEstado  { get; set; } = string.Empty;
-        public string UsuarioId    { get; set; } = string.Empty;
-        public string Motivo       { get; set; } = string.Empty;
+        public int    AudienciaId   { get; set; }
+        public string NuevoEstado   { get; set; } = string.Empty;
+        public string UsuarioId     { get; set; } = string.Empty;
+        public string Motivo        { get; set; } = string.Empty;
         public string VersionActual { get; set; } = string.Empty;
     }
 
