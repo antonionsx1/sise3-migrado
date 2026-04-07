@@ -3,16 +3,18 @@ using Agenda.Domain.Entities;
 
 namespace Agenda.Application.Reporte.Consulta.ExportarReporteTCA
 {
-    // ERROR ERR-EXP-001: Estructura incorrecta
-    // La lógica de validación de permisos, generación de contenido,
-    // procesamiento en segundo plano y descarga están todas mezcladas
-    // en una sola clase sin separación de responsabilidades
+    // CORRECCIÓN ERR-EXP-001: Estructura corregida
+    // Se separan las responsabilidades en clases independientes:
+    // - ExportarReporteTCAService: orquesta la exportación
+    // - PermisoExportacionHelper: valida permisos
+    // - GeneradorContenidoHelper: genera filas y encabezados
+    // - GestorTrabajoHelper: maneja exportación en segundo plano
+
     public class ExportarReporteTCAService
     {
-        private readonly List<Audiencia>    _audiencias;
-        private readonly List<Recordatorio> _recordatorios;
-        private readonly List<PermisoUsuario> _permisos;
-        private readonly List<TrabajoExportacion> _trabajos;
+        private readonly PermisoExportacionHelper  _permisoHelper;
+        private readonly GeneradorContenidoHelper  _generadorHelper;
+        private readonly GestorTrabajoHelper       _gestorHelper;
 
         public ExportarReporteTCAService(
             List<Audiencia>          audiencias,
@@ -20,45 +22,30 @@ namespace Agenda.Application.Reporte.Consulta.ExportarReporteTCA
             List<PermisoUsuario>     permisos,
             List<TrabajoExportacion> trabajos)
         {
-            _audiencias    = audiencias;
-            _recordatorios = recordatorios;
-            _permisos      = permisos;
-            _trabajos      = trabajos;
+            _permisoHelper   = new PermisoExportacionHelper(permisos);
+            _generadorHelper = new GeneradorContenidoHelper(audiencias, recordatorios);
+            _gestorHelper    = new GestorTrabajoHelper(trabajos);
         }
 
         public ResultadoExportacion Exportar(ExportarReporteTCARequest request)
         {
-            // Validación de permisos mezclada con generación
-            var permiso = _permisos.FirstOrDefault(p =>
-                p.UsuarioId == request.UsuarioId && p.Accion == "ExportarReporte");
-
-            if (permiso == null)
+            var validacionPermiso = _permisoHelper.ValidarPermiso(request.UsuarioId);
+            if (!validacionPermiso)
                 return ResultadoExportacion.Error("No cuenta con permiso para exportar reportes");
 
-            // Generación de contenido mezclada con lógica de tamaño
-            var filas = GenerarFilas(request);
+            var filas         = _generadorHelper.GenerarFilas(request);
             var estimadoBytes = filas.Count * 500;
-            var limiteBytes   = 5 * 1024 * 1024; // 5MB
+            var limiteBytes   = 5 * 1024 * 1024;
 
-            // Procesamiento en segundo plano mezclado con generación directa
             if (estimadoBytes > limiteBytes)
             {
-                var trabajo = new TrabajoExportacion
-                {
-                    Id          = Guid.NewGuid().ToString(),
-                    UsuarioId   = request.UsuarioId,
-                    Estado      = "EnProceso",
-                    FechaInicio = DateTime.Now,
-                    Parametros  = request
-                };
-                _trabajos.Add(trabajo);
-
-                return ResultadoExportacion.EnSegundoPlano(trabajo.Id);
+                var trabajoId = _gestorHelper.CrearTrabajo(request.UsuarioId, request);
+                return ResultadoExportacion.EnSegundoPlano(trabajoId);
             }
 
             var contenido = new ContenidoExportacion
             {
-                Encabezado         = GenerarEncabezado(request),
+                Encabezado         = _generadorHelper.GenerarEncabezado(request),
                 Filas              = filas,
                 FechaGeneracion    = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"),
                 UsuarioGenerador   = request.UsuarioId,
@@ -68,8 +55,35 @@ namespace Agenda.Application.Reporte.Consulta.ExportarReporteTCA
 
             return ResultadoExportacion.Exitoso(contenido);
         }
+    }
 
-        private List<string> GenerarEncabezado(ExportarReporteTCARequest request)
+    public class PermisoExportacionHelper
+    {
+        private readonly List<PermisoUsuario> _permisos;
+
+        public PermisoExportacionHelper(List<PermisoUsuario> permisos)
+        {
+            _permisos = permisos;
+        }
+
+        public bool ValidarPermiso(string usuarioId) =>
+            _permisos.Any(p => p.UsuarioId == usuarioId && p.Accion == "ExportarReporte");
+    }
+
+    public class GeneradorContenidoHelper
+    {
+        private readonly List<Audiencia>    _audiencias;
+        private readonly List<Recordatorio> _recordatorios;
+
+        public GeneradorContenidoHelper(
+            List<Audiencia>    audiencias,
+            List<Recordatorio> recordatorios)
+        {
+            _audiencias    = audiencias;
+            _recordatorios = recordatorios;
+        }
+
+        public List<string> GenerarEncabezado(ExportarReporteTCARequest request)
         {
             var encabezado = new List<string>();
             if (request.IncluirAudiencias)
@@ -84,7 +98,7 @@ namespace Agenda.Application.Reporte.Consulta.ExportarReporteTCA
             return encabezado;
         }
 
-        private List<List<string>> GenerarFilas(ExportarReporteTCARequest request)
+        public List<List<string>> GenerarFilas(ExportarReporteTCARequest request)
         {
             var filas = new List<List<string>>();
 
@@ -117,14 +131,38 @@ namespace Agenda.Application.Reporte.Consulta.ExportarReporteTCA
         }
     }
 
+    public class GestorTrabajoHelper
+    {
+        private readonly List<TrabajoExportacion> _trabajos;
+
+        public GestorTrabajoHelper(List<TrabajoExportacion> trabajos)
+        {
+            _trabajos = trabajos;
+        }
+
+        public string CrearTrabajo(string usuarioId, ExportarReporteTCARequest parametros)
+        {
+            var trabajo = new TrabajoExportacion
+            {
+                Id          = Guid.NewGuid().ToString(),
+                UsuarioId   = usuarioId,
+                Estado      = "EnProceso",
+                FechaInicio = DateTime.Now,
+                Parametros  = parametros
+            };
+            _trabajos.Add(trabajo);
+            return trabajo.Id;
+        }
+    }
+
     public class ExportarReporteTCARequest
     {
-        public string    UsuarioId          { get; set; } = string.Empty;
-        public string    Formato            { get; set; } = "XLSX";
-        public bool      IncluirAudiencias  { get; set; } = true;
+        public string    UsuarioId            { get; set; } = string.Empty;
+        public string    Formato              { get; set; } = "XLSX";
+        public bool      IncluirAudiencias    { get; set; } = true;
         public bool      IncluirRecordatorios { get; set; } = true;
-        public DateTime? FechaInicio        { get; set; }
-        public DateTime? FechaFin           { get; set; }
+        public DateTime? FechaInicio          { get; set; }
+        public DateTime? FechaFin             { get; set; }
     }
 
     public class ContenidoExportacion
@@ -139,10 +177,10 @@ namespace Agenda.Application.Reporte.Consulta.ExportarReporteTCA
 
     public class TrabajoExportacion
     {
-        public string                    Id          { get; set; } = string.Empty;
-        public string                    UsuarioId   { get; set; } = string.Empty;
-        public string                    Estado      { get; set; } = string.Empty;
-        public DateTime                  FechaInicio { get; set; }
+        public string                     Id          { get; set; } = string.Empty;
+        public string                     UsuarioId   { get; set; } = string.Empty;
+        public string                     Estado      { get; set; } = string.Empty;
+        public DateTime                   FechaInicio { get; set; }
         public ExportarReporteTCARequest? Parametros  { get; set; }
     }
 
@@ -154,10 +192,10 @@ namespace Agenda.Application.Reporte.Consulta.ExportarReporteTCA
 
     public class ResultadoExportacion
     {
-        public bool                Exito        { get; private set; }
-        public string              Mensaje      { get; private set; } = string.Empty;
-        public ContenidoExportacion? Contenido  { get; private set; }
-        public string?             TrabajoId    { get; private set; }
+        public bool                 Exito     { get; private set; }
+        public string               Mensaje   { get; private set; } = string.Empty;
+        public ContenidoExportacion? Contenido { get; private set; }
+        public string?              TrabajoId { get; private set; }
 
         public static ResultadoExportacion Exitoso(ContenidoExportacion contenido) =>
             new ResultadoExportacion { Exito = true, Contenido = contenido };
