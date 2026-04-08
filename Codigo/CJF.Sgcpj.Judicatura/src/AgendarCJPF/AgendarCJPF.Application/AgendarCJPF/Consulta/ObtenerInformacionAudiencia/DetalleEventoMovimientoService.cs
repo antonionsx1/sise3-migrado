@@ -18,10 +18,9 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.DetalleEventoMovimiento
             if (!string.IsNullOrEmpty(filtro.TipoEvento))
                 query = query.Where(e => e.TipoEvento == filtro.TipoEvento);
 
-            // ERROR ERR-EVT-001: Comentario incorrecto
-            // El comentario dice "orden descendente" pero el código ordena
-            // de forma ascendente (más antiguo primero)
-            // Ordenar de forma descendente (más reciente primero)
+            // CORRECCIÓN ERR-EVT-001: Comentario corregido
+            // OrdenCronologico = true ordena ascendente (más antiguo primero)
+            // OrdenCronologico = false ordena descendente (más reciente primero)
             var eventos = filtro.OrdenCronologico
                 ? query.OrderBy(e => e.FechaEvento).ToList()
                 : query.OrderByDescending(e => e.FechaEvento).ToList();
@@ -50,8 +49,8 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.DetalleEventoMovimiento
 
     public class FiltroEventoRequest
     {
-        public string TipoEvento        { get; set; } = string.Empty;
-        public bool   OrdenCronologico  { get; set; } = true;
+        public string TipoEvento       { get; set; } = string.Empty;
+        public bool   OrdenCronologico { get; set; } = true;
     }
 
     public class EventoMovimiento
@@ -75,8 +74,8 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.DetalleEventoMovimiento
 
     public class ResultadoEventos
     {
-        public bool   Exito    { get; private set; }
-        public string Mensaje  { get; private set; } = string.Empty;
+        public bool   Exito   { get; private set; }
+        public string Mensaje { get; private set; } = string.Empty;
         public List<EventoMovimientoDto> Eventos { get; private set; } = new();
 
         public static ResultadoEventos Exitoso(List<EventoMovimientoDto> eventos) =>
