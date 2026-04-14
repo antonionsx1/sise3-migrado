@@ -4,7 +4,7 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.AuditoriaExtensiones
 {
     public class AuditoriaExtensionesService
     {
-        private readonly List<RegistroExtension> _registros;
+        private readonly List<RegistroExtension>  _registros;
         private readonly List<EvidenciaExtension> _evidencias;
 
         public AuditoriaExtensionesService(
@@ -17,9 +17,13 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.AuditoriaExtensiones
 
         public ResultadoAuditoria ConsultarExtensiones(FiltroAuditoriaRequest filtro)
         {
-            // ERROR ERR-AUD-003: Manejo de errores erróneo
-            // No se valida que el rango de fechas sea correcto
-            // Si FechaFin < FechaInicio, la consulta retorna vacío sin avisar al usuario
+            // CORRECCIÓN ERR-AUD-003: Manejo de errores corregido
+            // Se valida que el rango de fechas sea correcto antes de consultar
+            if (filtro.FechaInicio.HasValue && filtro.FechaFin.HasValue &&
+                filtro.FechaFin.Value.Date < filtro.FechaInicio.Value.Date)
+                return ResultadoAuditoria.Error(
+                    "ERR-AUD-003: La fecha fin no puede ser anterior a la fecha inicio");
+
             var query = _registros.AsEnumerable();
 
             if (filtro.FechaInicio.HasValue)
@@ -33,15 +37,15 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.AuditoriaExtensiones
 
             var resultados = query.Select(r => new ExtensionAuditoriaDto
             {
-                Id                = r.Id,
-                AudienciaId       = r.AudienciaId,
-                NumeroExpediente  = r.NumeroExpediente,
-                OrganoId          = r.OrganoId,
-                MotivoExtension   = r.MotivoExtension,
-                FechaExtension    = r.FechaExtension.ToString("dd/MM/yyyy HH:mm"),
-                AutorizadoPor     = r.AutorizadoPor,
-                TieneEvidencia    = _evidencias.Any(e => e.RegistroId == r.Id),
-                IncidenciaFaltaEvidencia = !_evidencias.Any(e => e.RegistroId == r.Id)
+                Id                        = r.Id,
+                AudienciaId               = r.AudienciaId,
+                NumeroExpediente          = r.NumeroExpediente,
+                OrganoId                  = r.OrganoId,
+                MotivoExtension           = r.MotivoExtension,
+                FechaExtension            = r.FechaExtension.ToString("dd/MM/yyyy HH:mm"),
+                AutorizadoPor             = r.AutorizadoPor,
+                TieneEvidencia            = _evidencias.Any(e => e.RegistroId == r.Id),
+                IncidenciaFaltaEvidencia  = !_evidencias.Any(e => e.RegistroId == r.Id)
             }).ToList();
 
             if (!resultados.Any())
@@ -82,21 +86,21 @@ namespace AgendaCJPF.Application.AgendaCJPF.Consulta.AuditoriaExtensiones
 
     public class ExtensionAuditoriaDto
     {
-        public int    Id                       { get; set; }
-        public int    AudienciaId             { get; set; }
-        public string NumeroExpediente        { get; set; } = string.Empty;
-        public string OrganoId                { get; set; } = string.Empty;
-        public string MotivoExtension         { get; set; } = string.Empty;
-        public string FechaExtension          { get; set; } = string.Empty;
-        public string AutorizadoPor           { get; set; } = string.Empty;
-        public bool   TieneEvidencia          { get; set; }
+        public int    Id                        { get; set; }
+        public int    AudienciaId              { get; set; }
+        public string NumeroExpediente         { get; set; } = string.Empty;
+        public string OrganoId                 { get; set; } = string.Empty;
+        public string MotivoExtension          { get; set; } = string.Empty;
+        public string FechaExtension           { get; set; } = string.Empty;
+        public string AutorizadoPor            { get; set; } = string.Empty;
+        public bool   TieneEvidencia           { get; set; }
         public bool   IncidenciaFaltaEvidencia { get; set; }
     }
 
     public class ResultadoAuditoria
     {
-        public bool   Exito     { get; private set; }
-        public string Mensaje   { get; private set; } = string.Empty;
+        public bool   Exito   { get; private set; }
+        public string Mensaje { get; private set; } = string.Empty;
         public List<ExtensionAuditoriaDto> Extensiones { get; private set; } = new();
 
         public static ResultadoAuditoria Exitoso(List<ExtensionAuditoriaDto> extensiones) =>
