@@ -4,10 +4,10 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionResolucionSinAu
 {
     public class AutorizacionResolucionSinAudienciaService
     {
-        private readonly List<ResolucionCJPF>     _resoluciones;
-        private readonly List<NivelAutorizacion>  _niveles;
-        private readonly List<PerfilAutorizador>  _perfiles;
-        private readonly List<DictamenFinal>      _dictamenes;
+        private readonly List<ResolucionCJPF>    _resoluciones;
+        private readonly List<NivelAutorizacion> _niveles;
+        private readonly List<PerfilAutorizador> _perfiles;
+        private readonly List<DictamenFinal>     _dictamenes;
 
         public AutorizacionResolucionSinAudienciaService(
             List<ResolucionCJPF>    resoluciones,
@@ -31,32 +31,35 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionResolucionSinAu
                 return ResultadoOperacion.Error(
                     "Solo se pueden autorizar resoluciones en estado PendienteAutorizacion");
 
+            // CORRECCIÓN ERR-DOC-001: Manejo de errores corregido
+            // Se valida que exista soporte documental antes de autorizar
+            if (!resolucion.TieneSoporteDocumental)
+                return ResultadoOperacion.Error(
+                    "ERR-DOC-001: La resolución no cuenta con soporte documental requerido para su autorización");
+
             var nivel = ObtenerNivelRequerido(resolucion);
             if (nivel == null)
                 return ResultadoOperacion.Error(
                     "No se encontró el nivel de autorización requerido para este tipo de resolución");
 
-            // ERROR ERR-DOC-001: Manejo de errores erróneo
-            // No se valida que exista soporte documental antes de autorizar
-            // Permite autorizar resoluciones sin documentación de soporte
             var perfil = ObtenerAutorizadorDisponible(nivel, request.AutorizadorId);
             if (perfil == null)
                 return ResultadoOperacion.Error(
                     "El autorizador no tiene el nivel requerido o no está disponible. " +
                     "Se escalará al suplente");
 
-            resolucion.Estado       = "Autorizada";
-            resolucion.AutorizadoPor = perfil.UsuarioId;
+            resolucion.Estado            = "Autorizada";
+            resolucion.AutorizadoPor     = perfil.UsuarioId;
             resolucion.FechaAutorizacion = DateTime.Now;
 
             _dictamenes.Add(new DictamenFinal
             {
-                Id           = _dictamenes.Count + 1,
-                ResolucionId = resolucion.Id,
-                Dictamen     = "Autorizada",
+                Id            = _dictamenes.Count + 1,
+                ResolucionId  = resolucion.Id,
+                Dictamen      = "Autorizada",
                 AutorizadorId = perfil.UsuarioId,
                 Observaciones = request.Observaciones,
-                Fecha        = DateTime.Now
+                Fecha         = DateTime.Now
             });
 
             return ResultadoOperacion.Exitoso(
@@ -124,27 +127,27 @@ namespace AgendaCJPF.Application.AgendaCJPF.Comandos.AutorizacionResolucionSinAu
 
     public class ResolucionCJPF
     {
-        public int      Id               { get; set; }
-        public string   TipoResolucion   { get; set; } = string.Empty;
-        public string   Estado           { get; set; } = string.Empty;
+        public int      Id                     { get; set; }
+        public string   TipoResolucion         { get; set; } = string.Empty;
+        public string   Estado                 { get; set; } = string.Empty;
         public bool     TieneSoporteDocumental { get; set; }
-        public string?  AutorizadoPor    { get; set; }
-        public DateTime? FechaAutorizacion { get; set; }
+        public string?  AutorizadoPor          { get; set; }
+        public DateTime? FechaAutorizacion     { get; set; }
     }
 
     public class NivelAutorizacion
     {
-        public string TipoResolucion  { get; set; } = string.Empty;
-        public int    NivelRequerido  { get; set; }
+        public string TipoResolucion { get; set; } = string.Empty;
+        public int    NivelRequerido { get; set; }
     }
 
     public class PerfilAutorizador
     {
-        public string UsuarioId          { get; set; } = string.Empty;
-        public string Nombre             { get; set; } = string.Empty;
-        public int    NivelAutorizacion  { get; set; }
-        public bool   EstaDisponible     { get; set; }
-        public bool   EsSuplente         { get; set; }
+        public string UsuarioId         { get; set; } = string.Empty;
+        public string Nombre            { get; set; } = string.Empty;
+        public int    NivelAutorizacion { get; set; }
+        public bool   EstaDisponible    { get; set; }
+        public bool   EsSuplente        { get; set; }
     }
 
     public class DictamenFinal
