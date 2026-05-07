@@ -2,34 +2,31 @@ using Agenda.Application.Common.Models;
 
 namespace Agenda.Application.Seguridad.Consulta.AuditoriaPermisos
 {
-    // ERROR ERR-PER-001: Estructura incorrecta
-    // Toda la lógica de consulta, filtrado, validación de acceso y exportación
-    // está concentrada en una sola clase sin separación de responsabilidades.
-    // Debería separarse en:
-    // - AuditoriaPermisosQueryService (consulta y filtrado)
-    // - ExportacionAuditoriaHelper (lógica de exportación)
-    // - AccesoAuditoriaHelper (validación de permisos de auditoría)
+    // CORRECCIÓN ERR-PER-001: Estructura corregida
+    // Se separan las responsabilidades en clases independientes:
+    // - AuditoriaPermisosService: orquesta consulta y exportación
+    // - AccesoAuditoriaHelper: valida permisos de auditoría
+    // - ExportacionAuditoriaHelper: genera el contenido exportable
+
     public class AuditoriaPermisosService
     {
-        private readonly List<RegistroAuditoria> _registros;
-        private readonly List<PermisoAuditoria>  _permisosAuditoria;
+        private readonly List<RegistroAuditoria>  _registros;
+        private readonly AccesoAuditoriaHelper    _accesoHelper;
+        private readonly ExportacionAuditoriaHelper _exportHelper;
 
         public AuditoriaPermisosService(
             List<RegistroAuditoria> registros,
             List<PermisoAuditoria>  permisosAuditoria)
         {
-            _registros         = registros;
-            _permisosAuditoria = permisosAuditoria;
+            _registros    = registros;
+            _accesoHelper = new AccesoAuditoriaHelper(permisosAuditoria);
+            _exportHelper = new ExportacionAuditoriaHelper();
         }
 
         public ResultadoAuditoria ConsultarCambios(
             FiltroAuditoriaPermisosRequest filtro, string auditorId)
         {
-            // Validación de acceso mezclada con consulta
-            bool tieneAcceso = _permisosAuditoria.Any(p =>
-                p.UsuarioId == auditorId && p.PuedeAuditar);
-
-            if (!tieneAcceso)
+            if (!_accesoHelper.TieneAcceso(auditorId))
                 return ResultadoAuditoria.Denegado(
                     "No cuenta con permiso de auditoría para consultar esta información");
 
@@ -65,27 +62,45 @@ namespace Agenda.Application.Seguridad.Consulta.AuditoriaPermisos
             return ResultadoAuditoria.Exitoso(resultados);
         }
 
-        // Lógica de exportación mezclada en el mismo servicio
         public ResultadoExportacion ExportarEvidencia(
             FiltroAuditoriaPermisosRequest filtro, string auditorId, string formato)
         {
-            bool tieneAcceso = _permisosAuditoria.Any(p =>
-                p.UsuarioId == auditorId && p.PuedeAuditar);
-
-            if (!tieneAcceso)
+            if (!_accesoHelper.TieneAcceso(auditorId))
                 return ResultadoExportacion.Error("Acceso denegado para exportar evidencia");
 
             var resultado = ConsultarCambios(filtro, auditorId);
             if (!resultado.Exito)
                 return ResultadoExportacion.Error(resultado.Mensaje);
 
+            return _exportHelper.Exportar(resultado.Cambios, formato);
+        }
+    }
+
+    public class AccesoAuditoriaHelper
+    {
+        private readonly List<PermisoAuditoria> _permisos;
+
+        public AccesoAuditoriaHelper(List<PermisoAuditoria> permisos)
+        {
+            _permisos = permisos;
+        }
+
+        public bool TieneAcceso(string auditorId) =>
+            _permisos.Any(p => p.UsuarioId == auditorId && p.PuedeAuditar);
+    }
+
+    public class ExportacionAuditoriaHelper
+    {
+        public ResultadoExportacion Exportar(
+            List<CambioPermisosDto> cambios, string formato)
+        {
             var encabezado = new List<string>
             {
                 "ID", "Tipo Cambio", "Usuario Afectado", "Rol",
                 "Permiso", "Módulo", "Ejecutado Por", "Fecha"
             };
 
-            var filas = resultado.Cambios.Select(c => new List<string>
+            var filas = cambios.Select(c => new List<string>
             {
                 c.Id.ToString(), c.TipoCambio, c.UsuarioAfectado,
                 c.RolAfectado, c.Permiso, c.Modulo, c.EjecutadoPor, c.Fecha
@@ -117,7 +132,7 @@ namespace Agenda.Application.Seguridad.Consulta.AuditoriaPermisos
 
     public class PermisoAuditoria
     {
-        public string UsuarioId   { get; set; } = string.Empty;
+        public string UsuarioId    { get; set; } = string.Empty;
         public bool   PuedeAuditar { get; set; }
     }
 
@@ -158,11 +173,11 @@ namespace Agenda.Application.Seguridad.Consulta.AuditoriaPermisos
 
     public class ResultadoExportacion
     {
-        public bool             Exito     { get; private set; }
-        public string           Mensaje   { get; private set; } = string.Empty;
-        public List<string>     Encabezado { get; private set; } = new();
-        public List<List<string>> Filas   { get; private set; } = new();
-        public string           Formato   { get; private set; } = string.Empty;
+        public bool               Exito      { get; private set; }
+        public string             Mensaje    { get; private set; } = string.Empty;
+        public List<string>       Encabezado { get; private set; } = new();
+        public List<List<string>> Filas      { get; private set; } = new();
+        public string             Formato    { get; private set; } = string.Empty;
 
         public static ResultadoExportacion Exitoso(
             List<string> encabezado, List<List<string>> filas, string formato) =>
