@@ -20,9 +20,12 @@ namespace Agenda.Application.Areas.Comandos.DesvincularColaboradorArea
 
         public ResultadoOperacion Desvincular(DesvincularColaboradorRequest request)
         {
-            // ERROR ERR-AREA-003: Manejo de errores erróneo
-            // No se valida la confirmación del usuario antes de desvincular
-            // Permite desvincular sin que el usuario haya confirmado la acción
+            // CORRECCIÓN ERR-AREA-003: Manejo de errores corregido
+            // Se valida la confirmación del usuario antes de ejecutar la desvinculación
+            if (!request.Confirmado)
+                return ResultadoOperacion.Error(
+                    "ERR-AREA-003: Se requiere confirmación para desvincular al colaborador del área");
+
             var vinculacion = _vinculaciones
                 .FirstOrDefault(v => v.Id == request.VinculacionId);
 
@@ -50,7 +53,7 @@ namespace Agenda.Application.Areas.Comandos.DesvincularColaboradorArea
             if (vinculacion == null)
                 return ResultadoInfoDesvincular.Error("No se encontró la vinculación indicada");
 
-            var area = _areas.FirstOrDefault(a => a.Id == vinculacion.AreaId);
+            var area        = _areas.FirstOrDefault(a => a.Id == vinculacion.AreaId);
             var colaborador = _colaboradores.FirstOrDefault(c => c.Id == vinculacion.ColaboradorId);
 
             return ResultadoInfoDesvincular.Exitoso(
@@ -113,11 +116,11 @@ namespace Agenda.Application.Areas.Comandos.DesvincularColaboradorArea
 
     public class ResultadoInfoDesvincular
     {
-        public bool   Exito              { get; private set; }
-        public string Mensaje            { get; private set; } = string.Empty;
-        public int    VinculacionId      { get; private set; }
-        public string NombreColaborador  { get; private set; } = string.Empty;
-        public string NombreArea         { get; private set; } = string.Empty;
+        public bool   Exito             { get; private set; }
+        public string Mensaje           { get; private set; } = string.Empty;
+        public int    VinculacionId     { get; private set; }
+        public string NombreColaborador { get; private set; } = string.Empty;
+        public string NombreArea        { get; private set; } = string.Empty;
 
         public static ResultadoInfoDesvincular Exitoso(
             int vinculacionId, string nombreColaborador, string nombreArea) =>
