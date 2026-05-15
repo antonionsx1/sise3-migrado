@@ -2,31 +2,32 @@ using Agenda.Application.Common.Models;
 
 namespace Agenda.Application.Productividad.Consulta.ProductividadTramite
 {
-    // ERROR ERR-TRAM-001: Estructura incorrecta
-    // La lógica de contadores, gráfica de puntos, barras apiladas y cálculo
-    // por rol (Secretario, Oficial Judicial, Titular) están todas mezcladas
-    // en una sola clase sin separación de responsabilidades.
-    // Debería separarse en:
+    // CORRECCIÓN ERR-TRAM-001: Estructura corregida
+    // Se separan las responsabilidades en clases independientes:
     // - ProductividadTramiteService: orquesta la consulta
-    // - ContadoresHelper: calcula contadores por rol
-    // - GraficaPuntosHelper: construye y pagina la gráfica de puntos
-    // - BarrasApiladasHelper: agrupa acuerdos por tipo y mes
+    // - ContadoresRolHelper: calcula contadores según el rol
+    // - GraficaPuntosAcuerdoHelper: construye y pagina la gráfica de puntos
+    // - BarrasApiladasAcuerdoHelper: agrupa acuerdos por tipo y mes
+
     public class ProductividadTramiteService
     {
-        private readonly List<UsuarioTramite> _usuarios;
-        private readonly List<Acuerdo>        _acuerdos;
+        private readonly List<UsuarioTramite>       _usuarios;
+        private readonly ContadoresRolHelper        _contadoresHelper;
+        private readonly GraficaPuntosAcuerdoHelper _graficaHelper;
+        private readonly BarrasApiladasAcuerdoHelper _barrasHelper;
 
         public ProductividadTramiteService(
             List<UsuarioTramite> usuarios,
             List<Acuerdo>        acuerdos)
         {
-            _usuarios = usuarios;
-            _acuerdos = acuerdos;
+            _usuarios         = usuarios;
+            _contadoresHelper = new ContadoresRolHelper(acuerdos);
+            _graficaHelper    = new GraficaPuntosAcuerdoHelper(acuerdos);
+            _barrasHelper     = new BarrasApiladasAcuerdoHelper(acuerdos);
         }
 
-        public List<PestanaTramiteDto> ObtenerPestanas(int organoId)
-        {
-            return _usuarios
+        public List<PestanaTramiteDto> ObtenerPestanas(int organoId) =>
+            _usuarios
                 .Where(u => u.OrganoId == organoId)
                 .OrderBy(u => u.Orden)
                 .Select(u => new PestanaTramiteDto
@@ -38,9 +39,7 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadTramite
                     TipoArea       = u.TipoArea,
                     Fotografia     = u.Fotografia
                 }).ToList();
-        }
 
-        // Contadores, gráficas y cálculo de rol mezclados en un solo método
         public ResultadoProductividadTramite ObtenerProductividad(
             ProductividadTramiteRequest request)
         {
@@ -48,52 +47,167 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadTramite
             if (usuario == null)
                 return ResultadoProductividadTramite.Error("No se encontró el usuario");
 
+            var contadores    = _contadoresHelper.Calcular(request, usuario.Rol);
+            var graficaPuntos = _graficaHelper.Construir(request, usuario.Rol);
+            var graficaBarras = _barrasHelper.Agrupar(request.UsuarioId);
+
+            return ResultadoProductividadTramite.Exitoso(new DashboardTramiteDto
+            {
+                Usuario = new PestanaTramiteDto
+                {
+                    UsuarioId      = usuario.Id,
+                    NombreCompleto = usuario.NombreCompleto,
+                    NombreUsuario  = usuario.NombreUsuario,
+                    Rol            = usuario.Rol,
+                    TipoArea       = usuario.TipoArea,
+                    Fotografia     = usuario.Fotografia
+                },
+                EtiquetaRol       = contadores.EtiquetaRol,
+                ContadorPeriodo   = contadores.ContadorPeriodo,
+                TotalAnio         = contadores.TotalAnio,
+                PromedioXDia      = contadores.PromedioXDia,
+                TiempoPromedioMin = contadores.TiempoPromedioMin,
+                GraficaPuntos     = graficaPuntos,
+                GraficaBarras     = graficaBarras
+            });
+        }
+    }
+
+    public class ContadoresRolHelper
+    {
+        private readonly List<Acuerdo> _acuerdos;
+
+        public ContadoresRolHelper(List<Acuerdo> acuerdos) => _acuerdos = acuerdos;
+
+        public ContadoresRolDto Calcular(ProductividadTramiteRequest request, string rol)
+        {
             var inicioAnio = new DateTime(DateTime.Today.Year, 1, 1);
             var hoy        = DateTime.Today;
 
-            // Lógica de rol mezclada con contadores
-            var acuerdosPeriodo = ObtenerAcuerdosPorRol(
-                request.UsuarioId, usuario.Rol,
-                request.FechaInicio, request.FechaFin);
+            var periodo = Filtrar(request.UsuarioId, request.FechaInicio, request.FechaFin);
+            var anio    = Filtrar(request.UsuarioId, inicioAnio, hoy);
 
-            var acuerdosAnio = ObtenerAcuerdosPorRol(
-                request.UsuarioId, usuario.Rol, inicioAnio, hoy);
-
-            var trabajadosPeriodo = acuerdosPeriodo.Count(a => EsTrabajado(a, usuario.Rol));
-            var trabajadosAnio    = acuerdosAnio.Count(a => EsTrabajado(a, usuario.Rol));
+            var trabajadosPeriodo = periodo.Count(a => EsTrabajado(a, rol));
+            var trabajadosAnio    = anio.Count(a => EsTrabajado(a, rol));
             var diasAnio          = (hoy - inicioAnio).Days + 1;
 
             double promedioXDia = diasAnio > 0
                 ? Math.Round((double)trabajadosAnio / diasAnio, 2) : 0;
 
-            double tiempoPromedio = acuerdosAnio
-                .Where(a => EsTrabajado(a, usuario.Rol))
-                .Select(a => ObtenerTiempoTrabajo(a, usuario.Rol))
-                .DefaultIfEmpty(0)
-                .Average();
+            double tiempoPromedio = anio
+                .Where(a => EsTrabajado(a, rol))
+                .Select(a => ObtenerTiempo(a, rol))
+                .DefaultIfEmpty(0).Average();
 
-            // Gráfica de puntos mezclada con paginación
+            return new ContadoresRolDto
+            {
+                EtiquetaRol       = ObtenerEtiqueta(rol),
+                ContadorPeriodo   = $"{trabajadosPeriodo} de {periodo.Count}",
+                TotalAnio         = trabajadosAnio,
+                PromedioXDia      = promedioXDia,
+                TiempoPromedioMin = Math.Round(tiempoPromedio, 1)
+            };
+        }
+
+        private List<Acuerdo> Filtrar(string usuarioId, DateTime inicio, DateTime fin) =>
+            _acuerdos.Where(a =>
+                a.UsuarioId == usuarioId &&
+                a.FechaAsignacion.Date >= inicio.Date &&
+                a.FechaAsignacion.Date <= fin.Date).ToList();
+
+        private bool EsTrabajado(Acuerdo a, string rol) => rol switch
+        {
+            "Secretario"       => a.FechaPreautorizacion.HasValue,
+            "Oficial Judicial" => a.FechaElaboracion.HasValue,
+            _                  => a.FechaAutorizacion.HasValue
+        };
+
+        private double ObtenerTiempo(Acuerdo a, string rol) => rol switch
+        {
+            "Secretario"       => a.FechaPreautorizacion.HasValue && a.FechaElaboracion.HasValue
+                ? (a.FechaPreautorizacion.Value - a.FechaElaboracion.Value).TotalMinutes : 0,
+            "Oficial Judicial" => a.FechaElaboracion.HasValue
+                ? (a.FechaElaboracion.Value - a.FechaAsignacion).TotalMinutes : 0,
+            _                  => a.FechaAutorizacion.HasValue && a.FechaPreautorizacion.HasValue
+                ? (a.FechaAutorizacion.Value - a.FechaPreautorizacion.Value).TotalMinutes : 0
+        };
+
+        private string ObtenerEtiqueta(string rol) => rol switch
+        {
+            "Secretario"       => "Preautorizaciones",
+            "Oficial Judicial" => "Elaboraciones",
+            _                  => "Autorizaciones"
+        };
+    }
+
+    public class GraficaPuntosAcuerdoHelper
+    {
+        private readonly List<Acuerdo> _acuerdos;
+
+        public GraficaPuntosAcuerdoHelper(List<Acuerdo> acuerdos) => _acuerdos = acuerdos;
+
+        public GraficaPuntosAcuerdoDto Construir(
+            ProductividadTramiteRequest request, string rol)
+        {
             const int tamanioPagina = 40;
-            var ordenados    = acuerdosPeriodo.OrderBy(a => ObtenerHoraInicio(a, usuario.Rol)).ToList();
-            var totalPaginas = (int)Math.Ceiling((double)ordenados.Count / tamanioPagina);
+            var acuerdos = _acuerdos
+                .Where(a => a.UsuarioId == request.UsuarioId &&
+                            a.FechaAsignacion.Date >= request.FechaInicio.Date &&
+                            a.FechaAsignacion.Date <= request.FechaFin.Date)
+                .OrderBy(a => ObtenerHoraInicio(a, rol))
+                .ToList();
+
+            var totalPaginas = (int)Math.Ceiling((double)acuerdos.Count / tamanioPagina);
             var paginaActual = Math.Max(1, Math.Min(request.PaginaGrafica, totalPaginas));
 
-            var puntos = ordenados
+            var puntos = acuerdos
                 .Skip((paginaActual - 1) * tamanioPagina)
                 .Take(tamanioPagina)
                 .Select(a => new PuntoAcuerdoDto
                 {
                     NumeroExpediente = a.NumeroExpediente,
                     TipoAsuntoCorto  = a.TipoAsuntoCorto,
-                    HoraInicio       = ObtenerHoraInicio(a, usuario.Rol)?.ToString("HH:mm") ?? string.Empty,
-                    HoraFin          = ObtenerHoraFin(a, usuario.Rol)?.ToString("HH:mm") ?? string.Empty
+                    HoraInicio       = ObtenerHoraInicio(a, rol)?.ToString("HH:mm") ?? string.Empty,
+                    HoraFin          = ObtenerHoraFin(a, rol)?.ToString("HH:mm") ?? string.Empty
                 }).ToList();
 
-            // Gráfica de barras apiladas mezclada
-            var hace12Meses   = DateTime.Today.AddMonths(-11);
-            var inicioBarras  = new DateTime(hace12Meses.Year, hace12Meses.Month, 1);
-            var barrasApiladas = _acuerdos
-                .Where(a => a.UsuarioId == request.UsuarioId && a.FechaAsignacion >= inicioBarras)
+            return new GraficaPuntosAcuerdoDto
+            {
+                Puntos         = puntos,
+                PaginaActual   = paginaActual,
+                TotalPaginas   = totalPaginas,
+                TotalRegistros = acuerdos.Count
+            };
+        }
+
+        private DateTime? ObtenerHoraInicio(Acuerdo a, string rol) => rol switch
+        {
+            "Secretario"       => a.FechaElaboracion,
+            "Oficial Judicial" => a.FechaAsignacion,
+            _                  => a.FechaPreautorizacion
+        };
+
+        private DateTime? ObtenerHoraFin(Acuerdo a, string rol) => rol switch
+        {
+            "Secretario"       => a.FechaPreautorizacion,
+            "Oficial Judicial" => a.FechaElaboracion,
+            _                  => a.FechaAutorizacion
+        };
+    }
+
+    public class BarrasApiladasAcuerdoHelper
+    {
+        private readonly List<Acuerdo> _acuerdos;
+
+        public BarrasApiladasAcuerdoHelper(List<Acuerdo> acuerdos) => _acuerdos = acuerdos;
+
+        public List<BarraAcuerdoDto> Agrupar(string usuarioId)
+        {
+            var hace12Meses  = DateTime.Today.AddMonths(-11);
+            var inicioBarras = new DateTime(hace12Meses.Year, hace12Meses.Month, 1);
+
+            return _acuerdos
+                .Where(a => a.UsuarioId == usuarioId && a.FechaAsignacion >= inicioBarras)
                 .GroupBy(a => new { Mes = a.FechaAsignacion.ToString("MM/yyyy"), a.TipoAsunto })
                 .Select(g => new BarraAcuerdoDto
                 {
@@ -103,90 +217,26 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadTramite
                 })
                 .OrderBy(b => b.Mes)
                 .ToList();
-
-            var etiquetaRol = ObtenerEtiquetaRol(usuario.Rol);
-
-            return ResultadoProductividadTramite.Exitoso(new DashboardTramiteDto
-            {
-                Usuario          = new PestanaTramiteDto
-                {
-                    UsuarioId      = usuario.Id,
-                    NombreCompleto = usuario.NombreCompleto,
-                    NombreUsuario  = usuario.NombreUsuario,
-                    Rol            = usuario.Rol,
-                    TipoArea       = usuario.TipoArea,
-                    Fotografia     = usuario.Fotografia
-                },
-                EtiquetaRol      = etiquetaRol,
-                ContadorPeriodo  = $"{trabajadosPeriodo} de {acuerdosPeriodo.Count}",
-                TotalAnio        = trabajadosAnio,
-                PromedioXDia     = promedioXDia,
-                TiempoPromedioMin = Math.Round(tiempoPromedio, 1),
-                GraficaPuntos    = new GraficaPuntosAcuerdoDto
-                {
-                    Puntos         = puntos,
-                    PaginaActual   = paginaActual,
-                    TotalPaginas   = totalPaginas,
-                    TotalRegistros = ordenados.Count
-                },
-                GraficaBarras    = barrasApiladas
-            });
         }
-
-        private List<Acuerdo> ObtenerAcuerdosPorRol(
-            string usuarioId, string rol, DateTime inicio, DateTime fin)
-        {
-            return _acuerdos.Where(a =>
-                a.UsuarioId == usuarioId &&
-                a.FechaAsignacion.Date >= inicio.Date &&
-                a.FechaAsignacion.Date <= fin.Date).ToList();
-        }
-
-        private bool EsTrabajado(Acuerdo a, string rol) => rol switch
-        {
-            "Secretario"      => a.FechaPreautorizacion.HasValue,
-            "Oficial Judicial" => a.FechaElaboracion.HasValue,
-            _                 => a.FechaAutorizacion.HasValue
-        };
-
-        private double ObtenerTiempoTrabajo(Acuerdo a, string rol) => rol switch
-        {
-            "Secretario"      => a.FechaPreautorizacion.HasValue
-                ? (a.FechaPreautorizacion.Value - a.FechaElaboracion!.Value).TotalMinutes : 0,
-            "Oficial Judicial" => a.FechaElaboracion.HasValue
-                ? (a.FechaElaboracion.Value - a.FechaAsignacion).TotalMinutes : 0,
-            _                 => a.FechaAutorizacion.HasValue && a.FechaPreautorizacion.HasValue
-                ? (a.FechaAutorizacion.Value - a.FechaPreautorizacion.Value).TotalMinutes : 0
-        };
-
-        private DateTime? ObtenerHoraInicio(Acuerdo a, string rol) => rol switch
-        {
-            "Secretario"      => a.FechaElaboracion,
-            "Oficial Judicial" => a.FechaAsignacion,
-            _                 => a.FechaPreautorizacion
-        };
-
-        private DateTime? ObtenerHoraFin(Acuerdo a, string rol) => rol switch
-        {
-            "Secretario"      => a.FechaPreautorizacion,
-            "Oficial Judicial" => a.FechaElaboracion,
-            _                 => a.FechaAutorizacion
-        };
-
-        private string ObtenerEtiquetaRol(string rol) => rol switch
-        {
-            "Secretario"      => "Preautorizaciones",
-            "Oficial Judicial" => "Elaboraciones",
-            _                 => "Autorizaciones"
-        };
     }
+
+    // ── Modelos ───────────────────────────────────────────────────────────────
 
     public class ProductividadTramiteRequest
     {
-        public string   UsuarioId    { get; set; } = string.Empty;
-        public DateTime FechaInicio  { get; set; }
-        public DateTime FechaFin     { get; set; }
+        public string   UsuarioId     { get; set; } = string.Empty;
+        public DateTime FechaInicio   { get; set; }
+        public DateTime FechaFin      { get; set; }
         public int      PaginaGrafica { get; set; } = 1;
+    }
+
+    public class ContadoresRolDto
+    {
+        public string EtiquetaRol       { get; set; } = string.Empty;
+        public string ContadorPeriodo   { get; set; } = string.Empty;
+        public int    TotalAnio         { get; set; }
+        public double PromedioXDia      { get; set; }
+        public double TiempoPromedioMin { get; set; }
     }
 
     public class UsuarioTramite
@@ -203,15 +253,15 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadTramite
 
     public class Acuerdo
     {
-        public int      Id                  { get; set; }
-        public string   UsuarioId           { get; set; } = string.Empty;
-        public string   NumeroExpediente    { get; set; } = string.Empty;
-        public string   TipoAsunto          { get; set; } = string.Empty;
-        public string   TipoAsuntoCorto     { get; set; } = string.Empty;
-        public DateTime FechaAsignacion     { get; set; }
-        public DateTime? FechaElaboracion   { get; set; }
-        public DateTime? FechaPreautorizacion { get; set; }
-        public DateTime? FechaAutorizacion  { get; set; }
+        public int       Id                    { get; set; }
+        public string    UsuarioId             { get; set; } = string.Empty;
+        public string    NumeroExpediente      { get; set; } = string.Empty;
+        public string    TipoAsunto            { get; set; } = string.Empty;
+        public string    TipoAsuntoCorto       { get; set; } = string.Empty;
+        public DateTime  FechaAsignacion       { get; set; }
+        public DateTime? FechaElaboracion      { get; set; }
+        public DateTime? FechaPreautorizacion  { get; set; }
+        public DateTime? FechaAutorizacion     { get; set; }
     }
 
     public class PestanaTramiteDto
@@ -226,14 +276,14 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadTramite
 
     public class DashboardTramiteDto
     {
-        public PestanaTramiteDto        Usuario           { get; set; } = new();
-        public string                   EtiquetaRol       { get; set; } = string.Empty;
-        public string                   ContadorPeriodo   { get; set; } = string.Empty;
-        public int                      TotalAnio         { get; set; }
-        public double                   PromedioXDia      { get; set; }
-        public double                   TiempoPromedioMin { get; set; }
-        public GraficaPuntosAcuerdoDto  GraficaPuntos     { get; set; } = new();
-        public List<BarraAcuerdoDto>    GraficaBarras     { get; set; } = new();
+        public PestanaTramiteDto       Usuario           { get; set; } = new();
+        public string                  EtiquetaRol       { get; set; } = string.Empty;
+        public string                  ContadorPeriodo   { get; set; } = string.Empty;
+        public int                     TotalAnio         { get; set; }
+        public double                  PromedioXDia      { get; set; }
+        public double                  TiempoPromedioMin { get; set; }
+        public GraficaPuntosAcuerdoDto GraficaPuntos     { get; set; } = new();
+        public List<BarraAcuerdoDto>   GraficaBarras     { get; set; } = new();
     }
 
     public class GraficaPuntosAcuerdoDto
@@ -261,12 +311,12 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadTramite
 
     public class ResultadoProductividadTramite
     {
-        public bool                  Exito     { get; private set; }
-        public string                Mensaje   { get; private set; } = string.Empty;
-        public DashboardTramiteDto?  Dashboard { get; private set; }
+        public bool                 Exito     { get; private set; }
+        public string               Mensaje   { get; private set; } = string.Empty;
+        public DashboardTramiteDto? Dashboard { get; private set; }
 
-        public static ResultadoProductividadTramite Exitoso(DashboardTramiteDto dashboard) =>
-            new ResultadoProductividadTramite { Exito = true, Dashboard = dashboard };
+        public static ResultadoProductividadTramite Exitoso(DashboardTramiteDto d) =>
+            new ResultadoProductividadTramite { Exito = true, Dashboard = d };
 
         public static ResultadoProductividadTramite Error(string mensaje) =>
             new ResultadoProductividadTramite { Exito = false, Mensaje = mensaje };
