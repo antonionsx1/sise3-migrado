@@ -4,9 +4,9 @@ namespace Agenda.Application.Perfiles.Comandos.PermisosPersonalizados
 {
     public class PermisosPersonalizadosColaboradorService
     {
-        private readonly List<RolSistema>       _roles;
-        private readonly List<Colaborador>      _colaboradores;
-        private readonly List<PermisoRol>       _permisosRol;
+        private readonly List<RolSistema>           _roles;
+        private readonly List<Colaborador>          _colaboradores;
+        private readonly List<PermisoRol>           _permisosRol;
         private readonly List<PermisoPersonalizado> _permisosPersonalizados;
 
         public PermisosPersonalizadosColaboradorService(
@@ -32,13 +32,11 @@ namespace Agenda.Application.Perfiles.Comandos.PermisosPersonalizados
             if (colaborador == null)
                 return ResultadoPermisosColaborador.Error("No se encontró el colaborador indicado");
 
-            // Permisos base del rol
             var permisosBase = _permisosRol
                 .Where(p => p.RolId == rolId)
                 .Select(p => p.PermisoId)
                 .ToHashSet();
 
-            // Permisos personalizados del colaborador
             var personalizados = _permisosPersonalizados
                 .Where(p => p.ColaboradorId == colaboradorId && p.RolId == rolId)
                 .ToList();
@@ -63,31 +61,30 @@ namespace Agenda.Application.Perfiles.Comandos.PermisosPersonalizados
             if (colaborador == null)
                 return ResultadoOperacion.Error("No se encontró el colaborador indicado");
 
-            // ERROR ERR-PER-002: Manejo de errores erróneo
-            // No se valida si hubo cambios reales antes de guardar
-            // Permite guardar sin modificaciones mostrando el toast de éxito innecesariamente
+            // CORRECCIÓN ERR-PER-002: Manejo de errores corregido
+            // Se valida si hubo cambios reales antes de guardar
+            if (!TieneCambiosSinGuardar(request.ColaboradorId, request.RolId, request.PermisosIds))
+                return ResultadoOperacion.Error(
+                    "ERR-PER-002: No se detectaron cambios en los permisos. " +
+                    "Modifique los permisos antes de guardar");
 
-            // ERROR ERR-PER-003: Operador lógico erróneo
-            // Se usa && en lugar de || para validar permisos vacíos
-            // La condición nunca se cumple ya que PermisosIds no puede ser
-            // null Y vacío al mismo tiempo con esa lógica
-            if (request.PermisosIds == null && !request.PermisosIds.Any())
+            // CORRECCIÓN ERR-PER-003: Operador lógico corregido
+            // Se usa || para validar correctamente si la lista es nula O vacía
+            if (request.PermisosIds == null || !request.PermisosIds.Any())
                 return ResultadoOperacion.Error(
                     "ERR-PER-003: Debe seleccionar al menos un permiso o cancelar la edición");
 
-            // Eliminar personalizaciones anteriores
             _permisosPersonalizados.RemoveAll(p =>
                 p.ColaboradorId == request.ColaboradorId && p.RolId == request.RolId);
 
-            // Agregar nuevas personalizaciones
             foreach (var permisoId in request.PermisosIds)
             {
                 _permisosPersonalizados.Add(new PermisoPersonalizado
                 {
-                    Id            = _permisosPersonalizados.Count + 1,
-                    ColaboradorId = request.ColaboradorId,
-                    RolId         = request.RolId,
-                    PermisoId     = permisoId,
+                    Id                = _permisosPersonalizados.Count + 1,
+                    ColaboradorId     = request.ColaboradorId,
+                    RolId             = request.RolId,
+                    PermisoId         = permisoId,
                     FechaModificacion = DateTime.Now
                 });
             }
@@ -146,11 +143,11 @@ namespace Agenda.Application.Perfiles.Comandos.PermisosPersonalizados
 
     public class ResultadoPermisosColaborador
     {
-        public bool        Exito          { get; private set; }
-        public string      Mensaje        { get; private set; } = string.Empty;
-        public string      NombreColaborador { get; private set; } = string.Empty;
-        public string      NombreRol      { get; private set; } = string.Empty;
-        public List<int>   PermisosActivos { get; private set; } = new();
+        public bool      Exito             { get; private set; }
+        public string    Mensaje           { get; private set; } = string.Empty;
+        public string    NombreColaborador { get; private set; } = string.Empty;
+        public string    NombreRol         { get; private set; } = string.Empty;
+        public List<int> PermisosActivos   { get; private set; } = new();
 
         public static ResultadoPermisosColaborador Exitoso(
             string nombreColaborador, string nombreRol, List<int> permisos) =>
