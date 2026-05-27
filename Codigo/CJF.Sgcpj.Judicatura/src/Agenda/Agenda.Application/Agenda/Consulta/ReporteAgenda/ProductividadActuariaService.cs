@@ -4,8 +4,8 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadActuaria
 {
     public class ProductividadActuariaService
     {
-        private readonly List<UsuarioActuaria>  _usuarios;
-        private readonly List<Notificacion>     _notificaciones;
+        private readonly List<UsuarioActuaria> _usuarios;
+        private readonly List<Notificacion>    _notificaciones;
 
         public ProductividadActuariaService(
             List<UsuarioActuaria> usuarios,
@@ -52,7 +52,6 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadActuaria
             var realizadasPeriodo = notifPeriodo.Count(n => n.FechaNotificacion.HasValue);
             var realizadasAnio    = notifAnio.Count(n => n.FechaNotificacion.HasValue);
 
-            // Desglose por medio de notificación
             var desglose = notifAnio
                 .Where(n => n.FechaNotificacion.HasValue)
                 .GroupBy(n => n.MedioNotificacion)
@@ -62,15 +61,13 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadActuaria
                     Cantidad = g.Count()
                 }).ToList();
 
-            // Gráfica de puntos paginada
             var graficaPuntos = ConstruirGraficaPuntos(notifPeriodo, request.PaginaGrafica);
 
-            // ERROR ERR-ACT-001: Comentario incorrecto
-            // El comentario dice "últimos 12 meses" pero la gráfica por mes
-            // solo debe mostrar los últimos 6 meses según la HU
-            // Gráfica de barras apiladas por mes - últimos 12 meses
-            var hace6Meses    = DateTime.Today.AddMonths(-5);
-            var inicioBarras  = new DateTime(hace6Meses.Year, hace6Meses.Month, 1);
+            // CORRECCIÓN ERR-ACT-001: Comentario corregido
+            // La gráfica por mes muestra los últimos 6 meses (no 12) según la HU
+            // Gráfica de barras apiladas por mes - últimos 6 meses
+            var hace6Meses   = DateTime.Today.AddMonths(-5);
+            var inicioBarras = new DateTime(hace6Meses.Year, hace6Meses.Month, 1);
 
             var graficaBarrasMes = _notificaciones
                 .Where(n => n.UsuarioId == request.UsuarioId &&
@@ -90,13 +87,12 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadActuaria
                 .OrderBy(b => b.Periodo)
                 .ToList();
 
-            // Gráfica de barras por semana (mes seleccionado o mes en curso)
-            var mesGrafica = request.MesGraficaBarras ?? DateTime.Today;
+            var mesGrafica      = request.MesGraficaBarras ?? DateTime.Today;
             var graficaBarrasSemana = ConstruirBarrasSemana(request.UsuarioId, mesGrafica);
 
             return ResultadoActuaria.Exitoso(new DashboardActuariaDto
             {
-                Usuario           = new PestanaActuariaDto
+                Usuario = new PestanaActuariaDto
                 {
                     UsuarioId      = usuario.Id,
                     NombreCompleto = usuario.NombreCompleto,
@@ -104,11 +100,11 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadActuaria
                     Rol            = usuario.Rol,
                     Fotografia     = usuario.Fotografia
                 },
-                ContadorPeriodo   = $"{realizadasPeriodo} de {notifPeriodo.Count}",
-                TotalAnio         = realizadasAnio,
-                DesgloseMedios    = desglose,
-                GraficaPuntos     = graficaPuntos,
-                GraficaBarrasMes  = graficaBarrasMes,
+                ContadorPeriodo     = $"{realizadasPeriodo} de {notifPeriodo.Count}",
+                TotalAnio           = realizadasAnio,
+                DesgloseMedios      = desglose,
+                GraficaPuntos       = graficaPuntos,
+                GraficaBarrasMes    = graficaBarrasMes,
                 GraficaBarrasSemana = graficaBarrasSemana
             });
         }
@@ -126,10 +122,10 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadActuaria
                 .Take(tamanioPagina)
                 .Select(n => new PuntoNotifDto
                 {
-                    NumeroExpediente  = n.NumeroExpediente,
-                    TipoAsuntoCorto   = n.TipoAsuntoCorto,
-                    HoraAsignacion    = n.FechaAsignacion.ToString("HH:mm"),
-                    HoraNotificacion  = n.FechaNotificacion?.ToString("HH:mm") ?? string.Empty
+                    NumeroExpediente = n.NumeroExpediente,
+                    TipoAsuntoCorto  = n.TipoAsuntoCorto,
+                    HoraAsignacion   = n.FechaAsignacion.ToString("HH:mm"),
+                    HoraNotificacion = n.FechaNotificacion?.ToString("HH:mm") ?? string.Empty
                 }).ToList();
 
             return new GraficaPuntosNotifDto
@@ -170,11 +166,11 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadActuaria
 
     public class ActuariaRequest
     {
-        public string    UsuarioId          { get; set; } = string.Empty;
-        public DateTime  FechaInicio        { get; set; }
-        public DateTime  FechaFin           { get; set; }
-        public int       PaginaGrafica      { get; set; } = 1;
-        public DateTime? MesGraficaBarras   { get; set; }
+        public string    UsuarioId        { get; set; } = string.Empty;
+        public DateTime  FechaInicio      { get; set; }
+        public DateTime  FechaFin         { get; set; }
+        public int       PaginaGrafica    { get; set; } = 1;
+        public DateTime? MesGraficaBarras { get; set; }
     }
 
     public class UsuarioActuaria
@@ -240,13 +236,13 @@ namespace Agenda.Application.Productividad.Consulta.ProductividadActuaria
 
     public class DashboardActuariaDto
     {
-        public PestanaActuariaDto          Usuario             { get; set; } = new();
-        public string                      ContadorPeriodo     { get; set; } = string.Empty;
-        public int                         TotalAnio           { get; set; }
-        public List<DesgloseMedioDto>      DesgloseMedios      { get; set; } = new();
-        public GraficaPuntosNotifDto       GraficaPuntos       { get; set; } = new();
-        public List<BarraNotificacionDto>  GraficaBarrasMes    { get; set; } = new();
-        public List<BarraNotificacionDto>  GraficaBarrasSemana { get; set; } = new();
+        public PestanaActuariaDto         Usuario             { get; set; } = new();
+        public string                     ContadorPeriodo     { get; set; } = string.Empty;
+        public int                        TotalAnio           { get; set; }
+        public List<DesgloseMedioDto>     DesgloseMedios      { get; set; } = new();
+        public GraficaPuntosNotifDto      GraficaPuntos       { get; set; } = new();
+        public List<BarraNotificacionDto> GraficaBarrasMes    { get; set; } = new();
+        public List<BarraNotificacionDto> GraficaBarrasSemana { get; set; } = new();
     }
 
     public class ResultadoActuaria
