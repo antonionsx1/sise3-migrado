@@ -1,13 +1,53 @@
-﻿################################################################################
-# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
-################################################################################
+# Build output
+bin/
+obj/
+Debug/
+Release/
+dist/
+build/
 
-/Codigo/CJF.SGCPJ.APP/.vs
-.vs
-/Codigo/CJF.Sgcpj.Judicatura/src/Functions/Catalogos.Funtions/local.settings.json
-/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App/.vscode
-.vscode
-/Codigo/CJF.Sgcpj.Judicatura/src/Functions/Tramites.Functions/local.settings.json
-/.gitignore
-/Codigo/CJF.Sgcpj.App/CJF.Sgcpj.App/.env.dev
-/.gitignore
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Editors
+.vscode/
+.idea/
+
+# Node / frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.env
+.env.*
+!.env.example
+
+# Azure Functions / local configuration
+local.settings.json
+
+# Secrets and environment-specific Kubernetes manifests
+secrets.yml
+secrets.yaml
+*.secret.yml
+*.secret.yaml
+
+# Logs and diagnostics
+*.log
+logs/
+TestResults/
+*.trx
+coverage/
+
+# NuGet
+*.nupkg
+packages/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - Develop
+    - develop
 
 pool: 'SISE-CICD-DEV'
 

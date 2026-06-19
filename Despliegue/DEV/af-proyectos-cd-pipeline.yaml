@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - Develop
+    - develop
   paths:
     include:
     - Codigo/CJF.Sgcpj.Judicatura/src/Proyectos/**/*
